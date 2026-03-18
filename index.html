@@ -3,557 +3,179 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#0a0f1e">
 <title>KIRA — Smart Pet Feeder</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
-
 <style>
-/* ── VARIABLES ─────────────────────────────────────────────────── */
 :root {
-  --bg:        #0a0f1e;
-  --surface:   #111827;
-  --surface2:  #1a2236;
-  --border:    #1e2d47;
-  --accent:    #3b9eff;
-  --accent2:   #00e5ff;
-  --gold:      #f5c842;
-  --danger:    #ff4d6d;
-  --success:   #00e676;
-  --text:      #e8f0fe;
-  --muted:     #6b7ea8;
-  --font-head: 'Syne', sans-serif;
-  --font-body: 'DM Sans', sans-serif;
-  --radius:    16px;
-  --glow:      0 0 30px rgba(59,158,255,0.15);
+  --bg:      #0a0f1e;
+  --surface: #111827;
+  --surface2:#1a2236;
+  --border:  #1e2d47;
+  --accent:  #3b9eff;
+  --accent2: #00e5ff;
+  --success: #00e676;
+  --danger:  #ff4d6d;
+  --gold:    #f5c842;
+  --text:    #e8f0fe;
+  --muted:   #6b7ea8;
+  --radius:  16px;
+  --font-h:  'Syne', sans-serif;
+  --font-b:  'DM Sans', sans-serif;
 }
-
-/* ── RESET ──────────────────────────────────────────────────────── */
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { height: 100%; }
-body {
-  min-height: 100vh;
-  background: var(--bg);
-  color: var(--text);
-  font-family: var(--font-body);
-  font-weight: 400;
-  overflow-x: hidden;
-  -webkit-font-smoothing: antialiased;
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{height:100%}
+body{
+  min-height:100vh;background:var(--bg);color:var(--text);
+  font-family:var(--font-b);-webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
 }
-
-/* ── ANIMATED BACKGROUND ────────────────────────────────────────── */
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
+body::before{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
   background:
-    radial-gradient(ellipse 80% 50% at 20% 10%, rgba(59,158,255,0.07) 0%, transparent 60%),
-    radial-gradient(ellipse 60% 40% at 80% 90%, rgba(0,229,255,0.05) 0%, transparent 60%);
-  pointer-events: none;
-  z-index: 0;
+    radial-gradient(ellipse 80% 50% at 20% 10%,rgba(59,158,255,0.07),transparent 60%),
+    radial-gradient(ellipse 60% 40% at 80% 90%,rgba(0,229,255,0.05),transparent 60%);
 }
+.app{position:relative;z-index:1;max-width:420px;margin:0 auto;padding:0 0 40px}
 
-/* ── LAYOUT ─────────────────────────────────────────────────────── */
-.app {
-  position: relative;
-  z-index: 1;
-  max-width: 420px;
-  margin: 0 auto;
-  min-height: 100vh;
-  padding: 0 0 40px;
-  display: flex;
-  flex-direction: column;
-}
+/* HEADER */
+.header{padding:48px 20px 20px;display:flex;align-items:flex-start;justify-content:space-between}
+.brand-name{font-family:var(--font-h);font-size:34px;font-weight:800;letter-spacing:-1px;
+  background:linear-gradient(135deg,#fff,var(--accent));-webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;background-clip:text;line-height:1}
+.brand-sub{font-size:10px;font-weight:500;letter-spacing:3px;text-transform:uppercase;color:var(--muted)}
+.conn-pill{display:flex;align-items:center;gap:6px;padding:7px 13px;border-radius:999px;
+  border:1px solid var(--border);background:var(--surface);font-size:11px;font-weight:500;
+  letter-spacing:.5px;cursor:pointer;transition:all .3s;user-select:none}
+.conn-pill.connected{border-color:rgba(0,230,118,.3);background:rgba(0,230,118,.08);color:var(--success)}
+.conn-pill.connecting{border-color:rgba(245,200,66,.3);background:rgba(245,200,66,.08);color:var(--gold)}
+.conn-pill.disconnected{border-color:rgba(255,77,109,.3);background:rgba(255,77,109,.08);color:var(--danger)}
+.conn-dot{width:7px;height:7px;border-radius:50%;background:currentColor;flex-shrink:0}
+.conn-pill.connected .conn-dot{animation:pg 2s infinite}
+.conn-pill.connecting .conn-dot{animation:py 1s infinite}
+@keyframes pg{0%,100%{box-shadow:0 0 0 0 rgba(0,230,118,.4)}50%{box-shadow:0 0 0 5px rgba(0,230,118,0)}}
+@keyframes py{0%,100%{opacity:1}50%{opacity:.3}}
 
-/* ── HEADER ─────────────────────────────────────────────────────── */
-.header {
-  padding: 52px 24px 24px;
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-}
-.brand { display: flex; flex-direction: column; gap: 2px; }
-.brand-name {
-  font-family: var(--font-head);
-  font-size: 36px;
-  font-weight: 800;
-  letter-spacing: -1px;
-  background: linear-gradient(135deg, #fff 0%, var(--accent) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  line-height: 1;
-}
-.brand-sub {
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 3px;
-  text-transform: uppercase;
-  color: var(--muted);
-}
+/* SECTION LABEL */
+.slabel{font-family:var(--font-h);font-size:10px;font-weight:700;letter-spacing:2.5px;
+  text-transform:uppercase;color:var(--muted);padding:24px 20px 10px}
 
-/* ── CONNECTION STATUS PILL ─────────────────────────────────────── */
-.conn-pill {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 8px 14px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 0.5px;
-  transition: all 0.4s ease;
-  cursor: pointer;
-  user-select: none;
-}
-.conn-pill.connected {
-  border-color: rgba(0,230,118,0.3);
-  background: rgba(0,230,118,0.08);
-  color: var(--success);
-}
-.conn-pill.connecting {
-  border-color: rgba(245,200,66,0.3);
-  background: rgba(245,200,66,0.08);
-  color: var(--gold);
-}
-.conn-pill.disconnected {
-  border-color: rgba(255,77,109,0.3);
-  background: rgba(255,77,109,0.08);
-  color: var(--danger);
-}
-.conn-dot {
-  width: 8px; height: 8px;
-  border-radius: 50%;
-  background: currentColor;
-  flex-shrink: 0;
-}
-.conn-pill.connected .conn-dot { animation: pulse-green 2s infinite; }
-.conn-pill.connecting .conn-dot { animation: pulse-gold 1s infinite; }
+/* CAMERA CARD */
+.cam-card{margin:0 20px;background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);overflow:hidden}
+.cam-header{display:flex;align-items:center;justify-content:space-between;
+  padding:14px 16px;border-bottom:1px solid var(--border)}
+.cam-title{font-family:var(--font-h);font-size:13px;font-weight:700;color:var(--text)}
+.cam-status{font-size:11px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.cam-dot{width:6px;height:6px;border-radius:50%;background:var(--muted)}
+.cam-dot.active{background:var(--success);animation:pg 2s infinite}
+.cam-body{position:relative;background:#000;min-height:180px;
+  display:flex;align-items:center;justify-content:center}
+.cam-img{width:100%;display:block;border-radius:0}
+.cam-placeholder{display:flex;flex-direction:column;align-items:center;gap:10px;padding:40px}
+.cam-placeholder span{font-size:32px}
+.cam-placeholder p{font-size:12px;color:var(--muted);text-align:center}
+.cam-time{position:absolute;bottom:8px;right:10px;font-size:10px;
+  color:rgba(255,255,255,.6);font-family:monospace;background:rgba(0,0,0,.4);
+  padding:2px 6px;border-radius:4px}
+.snap-btn{margin:0;width:100%;padding:12px;border:none;background:var(--surface2);
+  color:var(--accent);font-family:var(--font-h);font-size:12px;font-weight:700;
+  letter-spacing:1px;text-transform:uppercase;cursor:pointer;transition:all .2s;
+  border-top:1px solid var(--border)}
+.snap-btn:hover{background:rgba(59,158,255,.1)}
+.snap-btn:active{transform:scale(.98)}
 
-@keyframes pulse-green {
-  0%,100% { box-shadow: 0 0 0 0 rgba(0,230,118,0.4); }
-  50%      { box-shadow: 0 0 0 5px rgba(0,230,118,0); }
-}
-@keyframes pulse-gold {
-  0%,100% { opacity: 1; }
-  50%      { opacity: 0.3; }
-}
+/* BOWL CARDS */
+.bowls{margin:0 20px;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.bowl-card{background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);padding:16px;display:flex;flex-direction:column;gap:12px}
+.bowl-title{font-family:var(--font-h);font-size:12px;font-weight:700;
+  letter-spacing:.5px;color:var(--muted);text-transform:uppercase}
+.bowl-visual{position:relative;height:80px;background:var(--surface2);
+  border-radius:10px;overflow:hidden;border:1px solid var(--border)}
+.bowl-fill{position:absolute;bottom:0;left:0;right:0;transition:height .8s ease;border-radius:0 0 9px 9px}
+.bowl-fill.full{height:85%;background:linear-gradient(0deg,rgba(0,230,118,.6),rgba(0,230,118,.2))}
+.bowl-fill.partial{height:45%;background:linear-gradient(0deg,rgba(245,200,66,.6),rgba(245,200,66,.2))}
+.bowl-fill.empty{height:8%;background:linear-gradient(0deg,rgba(255,77,109,.4),rgba(255,77,109,.1))}
+.bowl-fill.unknown{height:0%}
+.bowl-icon{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  font-size:24px;opacity:.6}
+.bowl-status{font-family:var(--font-h);font-size:11px;font-weight:700;
+  letter-spacing:1px;text-transform:uppercase;text-align:center}
+.bowl-status.full{color:var(--success)}
+.bowl-status.partial{color:var(--gold)}
+.bowl-status.empty{color:var(--danger)}
+.bowl-status.unknown{color:var(--muted)}
+.bowl-cm{font-size:10px;color:var(--muted);text-align:center;margin-top:2px}
 
-/* ── DEVICE CARD ────────────────────────────────────────────────── */
-.device-card {
-  margin: 8px 24px 0;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 20px;
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  position: relative;
-  overflow: hidden;
-  transition: border-color 0.4s;
-}
-.device-card.device-online { border-color: rgba(59,158,255,0.3); }
-.device-card::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, var(--accent), transparent);
-  opacity: 0;
-  transition: opacity 0.4s;
-}
-.device-card.device-online::before { opacity: 1; }
+/* CONTROL BUTTONS */
+.controls{margin:0 20px;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.ctrl-card{background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);padding:16px;display:flex;flex-direction:column;gap:12px}
+.ctrl-label{font-family:var(--font-h);font-size:12px;font-weight:700;
+  color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+.ctrl-btn{border:none;border-radius:10px;padding:14px 8px;
+  font-family:var(--font-h);font-size:11px;font-weight:700;
+  letter-spacing:1px;text-transform:uppercase;cursor:pointer;
+  transition:all .2s;-webkit-tap-highlight-color:transparent;width:100%}
+.ctrl-btn:active{transform:scale(.95)}
+.btn-food-on{background:rgba(0,230,118,.12);border:1px solid rgba(0,230,118,.3);color:var(--success)}
+.btn-food-on.active{background:rgba(0,230,118,.25);border-color:var(--success);
+  box-shadow:0 0 12px rgba(0,230,118,.3)}
+.btn-food-off{background:rgba(255,77,109,.1);border:1px solid rgba(255,77,109,.25);color:var(--danger)}
+.btn-water-on{background:rgba(59,158,255,.12);border:1px solid rgba(59,158,255,.3);color:var(--accent)}
+.btn-water-on.active{background:rgba(59,158,255,.25);border-color:var(--accent);
+  box-shadow:0 0 12px rgba(59,158,255,.3)}
+.btn-water-off{background:rgba(255,77,109,.1);border:1px solid rgba(255,77,109,.25);color:var(--danger)}
 
-.device-icon {
-  width: 48px; height: 48px;
-  border-radius: 12px;
-  background: linear-gradient(135deg, var(--surface2), var(--border));
-  border: 1px solid var(--border);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 22px;
-  flex-shrink: 0;
-}
-.device-info { flex: 1; }
-.device-name {
-  font-family: var(--font-head);
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--text);
-  letter-spacing: -0.3px;
-}
-.device-meta {
-  font-size: 12px;
-  color: var(--muted);
-  margin-top: 3px;
-  display: flex;
-  gap: 12px;
-}
-.device-meta span { display: flex; align-items: center; gap: 4px; }
+/* DEVICE CARD */
+.device-card{margin:12px 20px 0;background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);padding:16px;display:flex;gap:14px;align-items:center}
+.device-icon{width:44px;height:44px;border-radius:10px;background:var(--surface2);
+  border:1px solid var(--border);display:flex;align-items:center;justify-content:center;
+  font-size:20px;flex-shrink:0}
+.device-name{font-family:var(--font-h);font-size:14px;font-weight:700}
+.device-meta{font-size:11px;color:var(--muted);margin-top:3px}
+.device-time{font-family:var(--font-h);font-size:12px;font-weight:600;
+  color:var(--accent);margin-left:auto;flex-shrink:0}
 
-.device-state {
-  font-family: var(--font-head);
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
-  padding: 5px 10px;
-  border-radius: 6px;
-  background: var(--surface2);
-  color: var(--muted);
-  transition: all 0.3s;
-}
-.device-state.state-on  { background: rgba(0,230,118,0.12); color: var(--success); }
-.device-state.state-blink { background: rgba(59,158,255,0.12); color: var(--accent); animation: state-pulse 1s infinite; }
-@keyframes state-pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+/* LOG */
+.log-card{margin:12px 20px 0;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.log-header{padding:12px 16px;border-bottom:1px solid var(--border);
+  display:flex;justify-content:space-between;align-items:center}
+.log-title{font-family:var(--font-h);font-size:11px;font-weight:700;
+  letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)}
+.log-clear{font-size:11px;color:var(--muted);cursor:pointer;padding:3px 8px;
+  border-radius:6px;border:1px solid var(--border);background:transparent}
+.log-body{padding:10px;max-height:160px;overflow-y:auto;display:flex;flex-direction:column;gap:5px}
+.log-body::-webkit-scrollbar{width:3px}
+.log-body::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.log-entry{display:flex;gap:8px;align-items:flex-start;animation:li .2s ease}
+@keyframes li{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+.log-time{font-size:10px;color:var(--muted);font-family:monospace;flex-shrink:0;padding-top:1px}
+.log-msg{font-size:11px;color:var(--text);opacity:.8}
+.log-msg.info{color:var(--accent)}
+.log-msg.success{color:var(--success)}
+.log-msg.error{color:var(--danger)}
+.log-msg.warn{color:var(--gold)}
 
-/* ── SECTION LABEL ──────────────────────────────────────────────── */
-.section-label {
-  font-family: var(--font-head);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 2.5px;
-  text-transform: uppercase;
-  color: var(--muted);
-  padding: 28px 24px 12px;
-}
+/* FOOTER */
+.footer{padding:24px 20px 0;display:flex;justify-content:center}
+.footer-text{font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;opacity:.4}
 
-/* ── LED VISUALIZER ─────────────────────────────────────────────── */
-.led-visualizer {
-  margin: 0 24px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 32px 24px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
-  position: relative;
-  overflow: hidden;
-}
-.led-orb-wrap {
-  position: relative;
-  width: 100px; height: 100px;
-  display: flex; align-items: center; justify-content: center;
-}
-.led-orb-glow {
-  position: absolute;
-  inset: -20px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(59,158,255,0.3), transparent 70%);
-  opacity: 0;
-  transition: opacity 0.3s;
-}
-.led-orb-glow.on  { opacity: 1; }
-.led-orb-glow.blink { opacity: 1; animation: glow-blink var(--blink-speed, 500ms) infinite; }
-@keyframes glow-blink { 0%,100%{opacity:1} 50%{opacity:0.1} }
-
-.led-orb {
-  width: 64px; height: 64px;
-  border-radius: 50%;
-  background: var(--surface2);
-  border: 2px solid var(--border);
-  position: relative;
-  transition: all 0.3s ease;
-  display: flex; align-items: center; justify-content: center;
-}
-.led-orb.on {
-  background: radial-gradient(circle at 35% 35%, #7dd3fc, var(--accent));
-  border-color: var(--accent);
-  box-shadow: 0 0 20px rgba(59,158,255,0.6), 0 0 60px rgba(59,158,255,0.2);
-}
-.led-orb.blink {
-  animation: orb-blink var(--blink-speed, 500ms) infinite;
-}
-@keyframes orb-blink {
-  0%,100% {
-    background: radial-gradient(circle at 35% 35%, #7dd3fc, var(--accent));
-    border-color: var(--accent);
-    box-shadow: 0 0 20px rgba(59,158,255,0.6), 0 0 60px rgba(59,158,255,0.2);
-  }
-  50% {
-    background: var(--surface2);
-    border-color: var(--border);
-    box-shadow: none;
-  }
-}
-.led-orb-inner {
-  width: 16px; height: 16px;
-  border-radius: 50%;
-  background: rgba(255,255,255,0.15);
-}
-.led-label {
-  font-family: var(--font-head);
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 1px;
-  color: var(--muted);
-  text-transform: uppercase;
-}
-
-/* ── CONTROL GRID ───────────────────────────────────────────────── */
-.control-grid {
-  margin: 0 24px;
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 10px;
-}
-.ctrl-btn {
-  border: none; outline: none; cursor: pointer;
-  border-radius: 12px;
-  padding: 16px 8px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  font-family: var(--font-head);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  transition: all 0.2s ease;
-  position: relative;
-  overflow: hidden;
-  -webkit-tap-highlight-color: transparent;
-}
-.ctrl-btn:active { transform: scale(0.94); }
-
-.ctrl-btn .btn-icon { font-size: 22px; line-height: 1; }
-
-.btn-on {
-  background: rgba(0,230,118,0.1);
-  border: 1px solid rgba(0,230,118,0.25);
-  color: var(--success);
-}
-.btn-on:hover { background: rgba(0,230,118,0.18); border-color: rgba(0,230,118,0.5); }
-
-.btn-off {
-  background: rgba(255,77,109,0.1);
-  border: 1px solid rgba(255,77,109,0.25);
-  color: var(--danger);
-}
-.btn-off:hover { background: rgba(255,77,109,0.18); border-color: rgba(255,77,109,0.5); }
-
-.btn-blink {
-  background: rgba(59,158,255,0.1);
-  border: 1px solid rgba(59,158,255,0.25);
-  color: var(--accent);
-}
-.btn-blink:hover { background: rgba(59,158,255,0.18); border-color: rgba(59,158,255,0.5); }
-
-.ctrl-btn.active::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: currentColor;
-  opacity: 0.08;
-  border-radius: inherit;
-}
-
-/* ── DELAY SLIDER ───────────────────────────────────────────────── */
-.slider-card {
-  margin: 12px 24px 0;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 20px 20px 24px;
-}
-.slider-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16px;
-}
-.slider-title {
-  font-family: var(--font-head);
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--text);
-  letter-spacing: 0.3px;
-}
-.slider-value {
-  font-family: var(--font-head);
-  font-size: 20px;
-  font-weight: 800;
-  color: var(--accent);
-  letter-spacing: -0.5px;
-}
-.slider-unit {
-  font-size: 11px;
-  color: var(--muted);
-  font-weight: 400;
-}
-
-input[type=range] {
-  width: 100%;
-  height: 4px;
-  border-radius: 2px;
-  background: var(--border);
-  outline: none;
-  -webkit-appearance: none;
-  cursor: pointer;
-}
-input[type=range]::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 22px; height: 22px;
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 10px rgba(59,158,255,0.5);
-  cursor: pointer;
-  transition: transform 0.15s;
-}
-input[type=range]::-webkit-slider-thumb:active { transform: scale(1.3); }
-
-.slider-ticks {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 8px;
-}
-.slider-ticks span {
-  font-size: 10px;
-  color: var(--muted);
-}
-
-/* ── PING BUTTON ────────────────────────────────────────────────── */
-.ping-btn {
-  margin: 12px 24px 0;
-  width: calc(100% - 48px);
-  padding: 16px;
-  border: 1px dashed var(--border);
-  border-radius: var(--radius);
-  background: transparent;
-  color: var(--muted);
-  font-family: var(--font-head);
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  cursor: pointer;
-  transition: all 0.2s;
-  -webkit-tap-highlight-color: transparent;
-}
-.ping-btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(59,158,255,0.05); }
-.ping-btn:active { transform: scale(0.98); }
-
-/* ── LOG ────────────────────────────────────────────────────────── */
-.log-card {
-  margin: 12px 24px 0;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  overflow: hidden;
-}
-.log-header {
-  padding: 14px 16px;
-  border-bottom: 1px solid var(--border);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.log-title {
-  font-family: var(--font-head);
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-.log-clear {
-  font-size: 11px;
-  color: var(--muted);
-  cursor: pointer;
-  padding: 4px 8px;
-  border-radius: 6px;
-  border: 1px solid var(--border);
-  background: transparent;
-  transition: all 0.2s;
-  font-family: var(--font-body);
-}
-.log-clear:hover { color: var(--danger); border-color: rgba(255,77,109,0.3); }
-.log-body {
-  padding: 12px;
-  max-height: 180px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.log-body::-webkit-scrollbar { width: 3px; }
-.log-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
-
-.log-entry {
-  display: flex;
-  gap: 10px;
-  align-items: flex-start;
-  animation: log-in 0.25s ease;
-}
-@keyframes log-in {
-  from { opacity: 0; transform: translateY(4px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-.log-time {
-  font-size: 10px;
-  color: var(--muted);
-  font-family: monospace;
-  flex-shrink: 0;
-  padding-top: 1px;
-}
-.log-msg { font-size: 12px; color: var(--text); opacity: 0.8; }
-.log-msg.info  { color: var(--accent); }
-.log-msg.success { color: var(--success); }
-.log-msg.error { color: var(--danger); }
-.log-msg.warn  { color: var(--gold); }
-
-/* ── FOOTER ─────────────────────────────────────────────────────── */
-.footer {
-  margin-top: auto;
-  padding: 24px 24px 0;
-  display: flex;
-  justify-content: center;
-}
-.footer-text {
-  font-size: 11px;
-  color: var(--muted);
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  opacity: 0.5;
-}
-
-/* ── TOAST ──────────────────────────────────────────────────────── */
-.toast {
-  position: fixed;
-  bottom: 32px;
-  left: 50%;
-  transform: translateX(-50%) translateY(20px);
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 12px 20px;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text);
-  opacity: 0;
-  transition: all 0.3s ease;
-  pointer-events: none;
-  white-space: nowrap;
-  z-index: 100;
-  backdrop-filter: blur(10px);
-}
-.toast.show {
-  opacity: 1;
-  transform: translateX(-50%) translateY(0);
-}
+/* TOAST */
+.toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(20px);
+  background:var(--surface2);border:1px solid var(--border);border-radius:999px;
+  padding:11px 18px;font-size:12px;font-weight:500;color:var(--text);
+  opacity:0;transition:all .3s;pointer-events:none;white-space:nowrap;z-index:100;
+  backdrop-filter:blur(10px)}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 </style>
 </head>
 <body>
-
 <div class="app">
 
   <!-- HEADER -->
@@ -568,71 +190,99 @@ input[type=range]::-webkit-slider-thumb:active { transform: scale(1.3); }
     </div>
   </div>
 
-  <!-- DEVICE CARD -->
-  <div class="device-card" id="deviceCard">
+  <!-- DEVICE INFO -->
+  <div class="device-card">
     <div class="device-icon">🐱</div>
-    <div class="device-info">
-      <div class="device-name">KIRA ESP32 Node</div>
-      <div class="device-meta">
-        <span id="rssiVal">— dBm</span>
-        <span id="uptimeVal">— uptime</span>
-      </div>
+    <div>
+      <div class="device-name">KIRA Node 001</div>
+      <div class="device-meta" id="deviceMeta">— dBm &nbsp;|&nbsp; — uptime</div>
     </div>
-    <div class="device-state" id="deviceState">—</div>
+    <div class="device-time" id="deviceTime">--:--:--</div>
   </div>
 
-  <!-- LED SECTION -->
-  <div class="section-label">LED Control</div>
-
-  <!-- LED VISUALIZER -->
-  <div class="led-visualizer">
-    <div class="led-orb-wrap">
-      <div class="led-orb-glow" id="ledGlow"></div>
-      <div class="led-orb" id="ledOrb">
-        <div class="led-orb-inner"></div>
+  <!-- CAMERA -->
+  <div class="slabel">Live Camera</div>
+  <div class="cam-card">
+    <div class="cam-header">
+      <div class="cam-title">Motion Snapshot</div>
+      <div class="cam-status">
+        <div class="cam-dot" id="camDot"></div>
+        <span id="camStatus">Waiting...</span>
       </div>
     </div>
-    <div class="led-label" id="ledLabel">LED OFF</div>
+    <div class="cam-body">
+      <div class="cam-placeholder" id="camPlaceholder">
+        <span>📷</span>
+        <p>Snapshot appears here<br>when cat is detected</p>
+      </div>
+      <img id="camImg" class="cam-img" style="display:none" alt="snapshot">
+      <div class="cam-time" id="camTime" style="display:none"></div>
+    </div>
+    <button class="snap-btn" onclick="takeSnapshot()">📸 Take Snapshot Now</button>
+  </div>
+
+  <!-- BOWLS -->
+  <div class="slabel">Bowl Status</div>
+  <div class="bowls">
+
+    <!-- Food Bowl -->
+    <div class="bowl-card">
+      <div class="bowl-title">🍖 Food</div>
+      <div class="bowl-visual">
+        <div class="bowl-fill unknown" id="foodFill"></div>
+        <div class="bowl-icon">🥣</div>
+      </div>
+      <div class="bowl-status unknown" id="foodStatus">—</div>
+      <div class="bowl-cm" id="foodCm">— cm</div>
+    </div>
+
+    <!-- Water Bowl -->
+    <div class="bowl-card">
+      <div class="bowl-title">💧 Water</div>
+      <div class="bowl-visual">
+        <div class="bowl-fill unknown" id="waterFill"></div>
+        <div class="bowl-icon">🥛</div>
+      </div>
+      <div class="bowl-status unknown" id="waterStatus">—</div>
+      <div class="bowl-cm" id="waterCm">— cm</div>
+    </div>
+
   </div>
 
   <!-- CONTROLS -->
-  <div class="section-label">Commands</div>
-  <div class="control-grid">
-    <button class="ctrl-btn btn-on"    onclick="sendCmd('on')"    id="btnOn">
-      <span class="btn-icon">💡</span>ON
-    </button>
-    <button class="ctrl-btn btn-off"   onclick="sendCmd('off')"   id="btnOff">
-      <span class="btn-icon">🌑</span>OFF
-    </button>
-    <button class="ctrl-btn btn-blink" onclick="sendCmd('blink')" id="btnBlink">
-      <span class="btn-icon">✨</span>BLINK
-    </button>
-  </div>
+  <div class="slabel">Controls</div>
+  <div class="controls">
 
-  <!-- DELAY SLIDER -->
-  <div class="slider-card">
-    <div class="slider-header">
-      <div class="slider-title">Blink Speed</div>
-      <div>
-        <span class="slider-value" id="delayVal">500</span>
-        <span class="slider-unit"> ms</span>
-      </div>
+    <!-- Food Control -->
+    <div class="ctrl-card">
+      <div class="ctrl-label">🍖 Food</div>
+      <button class="ctrl-btn btn-food-on" id="btnFoodOn"
+              onclick="toggleFood()">
+        ▶ ON
+      </button>
+      <button class="ctrl-btn btn-food-off"
+              onclick="sendCmd('food_feed')">
+        🍽 Feed Now
+      </button>
     </div>
-    <input type="range" id="delaySlider"
-           min="100" max="2000" step="50" value="500"
-           oninput="updateDelay(this.value)">
-    <div class="slider-ticks">
-      <span>Fast 100ms</span>
-      <span>1000ms</span>
-      <span>Slow 2s</span>
-    </div>
-  </div>
 
-  <!-- PING -->
-  <button class="ping-btn" onclick="sendPing()">⚡ Ping Device</button>
+    <!-- Water Control -->
+    <div class="ctrl-card">
+      <div class="ctrl-label">💧 Water</div>
+      <button class="ctrl-btn btn-water-on" id="btnWaterOn"
+              onclick="toggleWater()">
+        ▶ ON
+      </button>
+      <button class="ctrl-btn btn-water-off"
+              onclick="sendCmd('water_feed')">
+        🚿 Dispense
+      </button>
+    </div>
+
+  </div>
 
   <!-- LOG -->
-  <div class="section-label">Activity Log</div>
+  <div class="slabel">Activity Log</div>
   <div class="log-card">
     <div class="log-header">
       <div class="log-title">Events</div>
@@ -647,82 +297,78 @@ input[type=range]::-webkit-slider-thumb:active { transform: scale(1.3); }
   </div>
 
   <div class="footer">
-    <div class="footer-text">NivaranTech · KIRA v0.1</div>
+    <div class="footer-text">NivaranTech · KIRA v1.0</div>
   </div>
-
 </div>
 
-<!-- TOAST -->
 <div class="toast" id="toast"></div>
 
 <script>
 // ── MQTT CONFIG ────────────────────────────────────────────────────
-const BROKER   = "wss://0b5088bcba2d4f4383816bdfe8ca662a.s1.eu.hivemq.cloud:8884/mqtt";
-const MQTT_USER = "NIVARANTECH";
-const MQTT_PASS = "Personal@1";
-const CLIENT_ID = "KIRA_WebUI_" + Math.random().toString(36).substr(2, 6);
+const BROKER  = "wss://0b5088bcba2d4f4383816bdfe8ca662a.s1.eu.hivemq.cloud:8884/mqtt";
+const USER    = "NIVARANTECH";
+const PASS    = "Personal@1";
+const CID     = "KIRA_WebUI_" + Math.random().toString(36).substr(2,6);
 
-const TOPIC_CMD    = "kira/led/command";
-const TOPIC_STATUS = "kira/device/status";
-const TOPIC_ALIVE  = "kira/device/alive";
+const T_CMD     = "kira/command";
+const T_STATUS  = "kira/status";
+const T_SNAP    = "kira/camera/snapshot";
+const T_SENSORS = "kira/sensors";
+const T_ALERT   = "kira/alert";
 
 // ── STATE ──────────────────────────────────────────────────────────
-let client       = null;
-let connected    = false;
-let blinkDelay   = 500;
-let blinkTimer   = null;
-let uiLedState   = false; // local UI blink state
-let currentCmd   = 'off';
+let client    = null;
+let connected = false;
+let foodOn    = false;
+let waterOn   = false;
+let lastSnap  = null;
 
 // ── CONNECT ───────────────────────────────────────────────────────
 function connect() {
-  setConnState('connecting', 'Connecting...');
-  addLog('Connecting to KIRA broker...', 'info');
+  setConn('connecting', 'Connecting...');
+  addLog('Connecting to broker...', 'info');
 
-  const opts = {
-    username: MQTT_USER,
-    password: MQTT_PASS,
-    clientId: CLIENT_ID,
-    clean: true,
-    reconnectPeriod: 5000,
-    connectTimeout: 10000,
-  };
-
-  client = mqtt.connect(BROKER, opts);
+  client = mqtt.connect(BROKER, {
+    username: USER, password: PASS,
+    clientId: CID, clean: true,
+    reconnectPeriod: 5000, connectTimeout: 10000
+  });
 
   client.on('connect', () => {
     connected = true;
-    setConnState('connected', 'Online');
-    addLog('Connected to HiveMQ broker', 'success');
-    client.subscribe(TOPIC_STATUS);
-    client.subscribe(TOPIC_ALIVE);
-    addLog('Subscribed to device topics', 'info');
-    showToast('✅ Connected to KIRA broker');
+    setConn('connected', 'Online');
+    addLog('Connected to KIRA broker', 'success');
+    client.subscribe(T_STATUS);
+    client.subscribe(T_SNAP);
+    client.subscribe(T_SENSORS);
+    client.subscribe(T_ALERT);
+    showToast('✅ Connected to KIRA');
+    sendCmd('status');
   });
 
   client.on('message', (topic, payload) => {
     const msg = payload.toString();
+    if (topic === T_SNAP) {
+      handleSnapshot(msg);
+      return;
+    }
     try {
       const data = JSON.parse(msg);
-      handleDeviceMessage(data);
-    } catch(e) {
-      addLog('Raw: ' + msg, 'info');
-    }
-  });
-
-  client.on('error', (err) => {
-    addLog('Error: ' + err.message, 'error');
+      if (topic === T_STATUS)  handleStatus(data);
+      if (topic === T_SENSORS) handleSensors(data);
+      if (topic === T_ALERT)   handleAlert(data);
+    } catch(e) {}
   });
 
   client.on('close', () => {
     connected = false;
-    setConnState('disconnected', 'Offline');
-    setDeviceOffline();
-    addLog('Disconnected from broker', 'warn');
+    setConn('disconnected', 'Offline');
+    addLog('Disconnected', 'warn');
   });
 
+  client.on('error', (e) => addLog('Error: ' + e.message, 'error'));
   client.on('reconnect', () => {
-    setConnState('connecting', 'Reconnecting...');
+    setConn('connecting', 'Reconnecting...');
     addLog('Reconnecting...', 'warn');
   });
 }
@@ -730,152 +376,171 @@ function connect() {
 function disconnect() {
   if (client) { client.end(); client = null; }
   connected = false;
-  setConnState('disconnected', 'Offline');
+  setConn('disconnected', 'Offline');
 }
 
 function toggleConnect() {
-  if (connected) disconnect();
-  else connect();
+  connected ? disconnect() : connect();
 }
 
-// ── HANDLE DEVICE MESSAGE ─────────────────────────────────────────
-function handleDeviceMessage(data) {
-  const state = data.state || '';
-
-  // Update device card
-  document.getElementById('deviceCard').classList.add('device-online');
-  if (data.rssi) document.getElementById('rssiVal').textContent = data.rssi + ' dBm';
-  if (data.uptime !== undefined) {
-    const u = data.uptime;
-    const t = u < 60 ? u + 's' : u < 3600 ? Math.floor(u/60) + 'm' : Math.floor(u/3600) + 'h';
-    document.getElementById('uptimeVal').textContent = t + ' uptime';
+// ── HANDLE MESSAGES ───────────────────────────────────────────────
+function handleStatus(d) {
+  // Device meta
+  if (d.rssi || d.uptime) {
+    const rssi   = d.rssi   ? d.rssi + ' dBm' : '—';
+    const uptime = d.uptime ? formatUptime(d.uptime) : '—';
+    document.getElementById('deviceMeta').textContent = rssi + '  |  ' + uptime;
   }
+  if (d.time) document.getElementById('deviceTime').textContent = d.time;
 
-  // Update device state badge
-  const stateEl = document.getElementById('deviceState');
-  stateEl.className = 'device-state';
-  if (state === 'on' || state === 'pong') {
-    stateEl.classList.add('state-on');
-    stateEl.textContent = state === 'pong' ? 'PONG ✓' : 'ON';
-  } else if (state === 'blinking') {
-    stateEl.classList.add('state-blink');
-    stateEl.textContent = 'BLINK';
-  } else if (state === 'offline') {
-    stateEl.textContent = 'OFFLINE';
-    setDeviceOffline();
-  } else {
-    stateEl.textContent = state.toUpperCase() || '—';
-  }
+  // Food/water state
+  if (d.food_on  !== undefined) updateFoodBtn(d.food_on);
+  if (d.water_on !== undefined) updateWaterBtn(d.water_on);
 
-  // Update LED visualizer
-  updateLEDVisual(state);
+  // Bowl levels
+  if (d.food_status)  updateBowl('food',  d.food_status,  d.food_cm);
+  if (d.water_status) updateBowl('water', d.water_status, d.water_cm);
 
-  addLog('Device: ' + state + (data.uptime ? ' | up ' + data.uptime + 's' : ''), 'success');
-
-  if (state === 'pong') showToast('🏓 Pong received!');
+  addLog('Status updated', 'info');
 }
 
-// ── LED VISUAL ────────────────────────────────────────────────────
-function updateLEDVisual(state) {
-  const orb   = document.getElementById('ledOrb');
-  const glow  = document.getElementById('ledGlow');
-  const label = document.getElementById('ledLabel');
+function handleSensors(d) {
+  if (d.food_status)  updateBowl('food',  d.food_status,  d.food_cm);
+  if (d.water_status) updateBowl('water', d.water_status, d.water_cm);
+}
 
-  // Clear blink timer
-  clearInterval(blinkTimer);
-  orb.className  = 'led-orb';
-  glow.className = 'led-orb-glow';
+function handleAlert(d) {
+  const type = d.type || '';
+  const time = d.time || '';
 
-  if (state === 'on' || state === 'pong') {
-    orb.classList.add('on');
-    glow.classList.add('on');
-    label.textContent = 'LED ON';
-    currentCmd = 'on';
-  } else if (state === 'blinking') {
-    orb.classList.add('blink');
-    glow.classList.add('blink');
-    orb.style.setProperty('--blink-speed', blinkDelay + 'ms');
-    glow.style.setProperty('--blink-speed', blinkDelay + 'ms');
-    label.textContent = 'BLINKING · ' + blinkDelay + 'ms';
-    currentCmd = 'blink';
-  } else if (state === 'off' || state === 'offline') {
-    label.textContent = 'LED OFF';
-    currentCmd = 'off';
+  if (type === 'motion') {
+    addLog('🐱 Cat detected at ' + time, 'success');
+    showToast('🐱 Cat at feeder!');
   }
+  else if (type === 'food_empty') {
+    addLog('⚠️ Food bowl EMPTY at ' + time, 'warn');
+    showToast('⚠️ Food bowl empty — refill needed!');
+  }
+  else if (type === 'water_empty') {
+    addLog('⚠️ Water bowl EMPTY at ' + time, 'warn');
+    showToast('⚠️ Water bowl empty — refill needed!');
+  }
+  else if (type === 'scheduled_feed') {
+    addLog('🍽 Scheduled feed #' + d.index + ' at ' + time, 'success');
+    showToast('🍽 Scheduled feeding completed');
+  }
+}
 
-  // Update button active states
-  ['btnOn','btnOff','btnBlink'].forEach(id => {
-    document.getElementById(id).classList.remove('active');
-  });
-  if (state === 'on') document.getElementById('btnOn').classList.add('active');
-  if (state === 'off') document.getElementById('btnOff').classList.add('active');
-  if (state === 'blinking') document.getElementById('btnBlink').classList.add('active');
+function handleSnapshot(b64) {
+  const img = document.getElementById('camImg');
+  const placeholder = document.getElementById('camPlaceholder');
+  const timeEl = document.getElementById('camTime');
+  const dot = document.getElementById('camDot');
+  const status = document.getElementById('camStatus');
+
+  // Show image
+  img.src = 'data:image/jpeg;base64,' + b64;
+  img.style.display = 'block';
+  placeholder.style.display = 'none';
+  timeEl.style.display = 'block';
+  timeEl.textContent = new Date().toLocaleTimeString();
+
+  dot.classList.add('active');
+  status.textContent = 'Live snapshot';
+
+  lastSnap = new Date();
+  addLog('📸 Snapshot received', 'success');
+  showToast('📸 Snapshot updated');
+}
+
+// ── BOWL UPDATE ───────────────────────────────────────────────────
+function updateBowl(type, status, cm) {
+  const fill   = document.getElementById(type + 'Fill');
+  const statusEl = document.getElementById(type + 'Status');
+  const cmEl   = document.getElementById(type + 'Cm');
+
+  const s = status.toLowerCase();
+
+  // Remove old classes
+  fill.className = 'bowl-fill ' + s;
+  statusEl.className = 'bowl-status ' + s;
+  statusEl.textContent = status;
+
+  if (cm) cmEl.textContent = cm + ' cm';
+}
+
+// ── FOOD CONTROL ──────────────────────────────────────────────────
+function toggleFood() {
+  if (!connected) { showToast('⚠️ Not connected'); return; }
+  foodOn = !foodOn;
+  sendCmd(foodOn ? 'food_on' : 'food_off');
+  updateFoodBtn(foodOn);
+  addLog('Food: ' + (foodOn ? 'ON' : 'OFF'), foodOn ? 'success' : 'info');
+  showToast('🍖 Food ' + (foodOn ? 'ON' : 'OFF'));
+}
+
+function updateFoodBtn(state) {
+  foodOn = state;
+  const btn = document.getElementById('btnFoodOn');
+  btn.textContent = state ? '⏹ OFF' : '▶ ON';
+  btn.className   = 'ctrl-btn btn-food-on' + (state ? ' active' : '');
+}
+
+// ── WATER CONTROL ─────────────────────────────────────────────────
+function toggleWater() {
+  if (!connected) { showToast('⚠️ Not connected'); return; }
+  waterOn = !waterOn;
+  sendCmd(waterOn ? 'water_on' : 'water_off');
+  updateWaterBtn(waterOn);
+  addLog('Water: ' + (waterOn ? 'ON' : 'OFF'), waterOn ? 'success' : 'info');
+  showToast('💧 Water ' + (waterOn ? 'ON' : 'OFF'));
+}
+
+function updateWaterBtn(state) {
+  waterOn = state;
+  const btn = document.getElementById('btnWaterOn');
+  btn.textContent = state ? '⏹ OFF' : '▶ ON';
+  btn.className   = 'ctrl-btn btn-water-on' + (state ? ' active' : '');
+}
+
+// ── SNAPSHOT ──────────────────────────────────────────────────────
+function takeSnapshot() {
+  if (!connected) { showToast('⚠️ Not connected'); return; }
+  sendCmd('snapshot');
+  addLog('📸 Snapshot requested...', 'info');
+  showToast('📸 Requesting snapshot...');
 }
 
 // ── SEND COMMAND ──────────────────────────────────────────────────
 function sendCmd(cmd) {
-  if (!connected) {
-    showToast('⚠️ Not connected — tap the status pill');
-    addLog('Cannot send — not connected', 'error');
-    return;
-  }
-  const payload = JSON.stringify({
-    cmd: cmd,
-    delay: blinkDelay,
-    source: 'webui'
-  });
-  client.publish(TOPIC_CMD, payload);
-  addLog('Sent: ' + cmd + (cmd === 'blink' ? ' @' + blinkDelay + 'ms' : ''), 'info');
-  showToast('📤 ' + cmd.toUpperCase() + ' sent');
-}
-
-function sendPing() {
-  if (!connected) { showToast('⚠️ Not connected'); return; }
-  client.publish(TOPIC_CMD, JSON.stringify({ cmd: 'ping' }));
-  addLog('Ping sent → waiting for pong...', 'info');
-  showToast('⚡ Ping sent');
-}
-
-// ── DELAY SLIDER ──────────────────────────────────────────────────
-function updateDelay(val) {
-  blinkDelay = parseInt(val);
-  document.getElementById('delayVal').textContent = blinkDelay;
-  // If currently blinking, update speed live
-  if (currentCmd === 'blink') {
-    document.getElementById('ledOrb').style.setProperty('--blink-speed', blinkDelay + 'ms');
-    document.getElementById('ledGlow').style.setProperty('--blink-speed', blinkDelay + 'ms');
-    document.getElementById('ledLabel').textContent = 'BLINKING · ' + blinkDelay + 'ms';
-    if (connected) {
-      client.publish(TOPIC_CMD, JSON.stringify({ cmd: 'blink', delay: blinkDelay }));
-    }
-  }
+  if (!connected || !client) return;
+  const payload = JSON.stringify({ cmd, source: 'webui' });
+  client.publish(T_CMD, payload);
+  addLog('Sent: ' + cmd, 'info');
 }
 
 // ── HELPERS ───────────────────────────────────────────────────────
-function setConnState(state, text) {
+function setConn(state, text) {
   const pill = document.getElementById('connPill');
   pill.className = 'conn-pill ' + state;
   document.getElementById('connText').textContent = text;
 }
 
-function setDeviceOffline() {
-  document.getElementById('deviceCard').classList.remove('device-online');
-  document.getElementById('deviceState').className = 'device-state';
-  document.getElementById('deviceState').textContent = '—';
-  updateLEDVisual('off');
+function formatUptime(sec) {
+  if (sec < 60)   return sec + 's uptime';
+  if (sec < 3600) return Math.floor(sec/60) + 'm uptime';
+  return Math.floor(sec/3600) + 'h uptime';
 }
 
-function addLog(msg, type = '') {
+function addLog(msg, type='') {
   const body = document.getElementById('logBody');
-  const now  = new Date();
-  const time = now.toTimeString().substr(0,8);
-  const entry = document.createElement('div');
-  entry.className = 'log-entry';
-  entry.innerHTML = `<span class="log-time">${time}</span><span class="log-msg ${type}">${msg}</span>`;
-  body.appendChild(entry);
+  const t    = new Date().toTimeString().substr(0,8);
+  const div  = document.createElement('div');
+  div.className = 'log-entry';
+  div.innerHTML = `<span class="log-time">${t}</span><span class="log-msg ${type}">${msg}</span>`;
+  body.appendChild(div);
   body.scrollTop = body.scrollHeight;
-  // Keep max 50 entries
-  while (body.children.length > 50) body.removeChild(body.firstChild);
+  while (body.children.length > 60) body.removeChild(body.firstChild);
 }
 
 function clearLog() {
@@ -892,11 +557,9 @@ function showToast(msg) {
   toastTimer = setTimeout(() => t.classList.remove('show'), 2500);
 }
 
-// Auto-connect on load
+// Auto connect
 window.addEventListener('load', () => {
-  addLog('KIRA Web UI v0.1 loaded', 'info');
-  addLog('Tap the pill to connect', 'info');
-  // Auto connect after short delay
+  addLog('KIRA Web UI v1.0 loaded', 'info');
   setTimeout(connect, 800);
 });
 </script>
