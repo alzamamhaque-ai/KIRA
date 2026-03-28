@@ -124,6 +124,8 @@
   .btn-primary   { background: #4a9eff; color: #fff; grid-column: 1 / -1; }
   .btn-green  { background: #0d4030; color: #4eff91; border: 1px solid #1e6040; }
   .btn-orange { background: #3d2000; color: #ffaa00; border: 1px solid #5a3000; }
+.btn-secondary { background: #0d1f35; color: #8899aa; border: 1px solid #1e3a5f; }
+.btn-warn { background: #3d0d0d; color: #ff6b35; border: 1px solid #6a1a1a; }
 
   /* Badges & Power Info */
   .badge-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
@@ -208,11 +210,15 @@
     <button class="btn btn-primary" onclick="sendCmd('SNAPSHOT')">📸 Take Snapshot</button>
   </div>
 
-  <div class="card">
+ <div class="card">
     <div class="card-title">Controls</div>
     <div class="btn-row">
       <button class="btn btn-green" onclick="sendCmd('FEED:NOW')">🍖 Feed Now</button>
       <button class="btn btn-orange" onclick="sendCmd('WATER:NOW')">💧 Water Now</button>
+    </div>
+    <div class="btn-row" style="margin-top:10px">
+      <button id="servo-btn" class="btn btn-secondary" onclick="toggleServo()">🔧 Open Flap</button>
+      <button id="valve-btn" class="btn btn-secondary" onclick="toggleValve()">🔧 Open Valve</button>
     </div>
   </div>
 
@@ -371,7 +377,35 @@ function logItem(m, type) {
   div.innerHTML = `<span class="log-time">${new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span> ${m}`;
   log.insertBefore(div, log.firstChild);
 }
+let servoIsOpen = false;
+function toggleServo() {
+  if (!servoIsOpen) {
+    sendCmd('SERVO:OPEN');
+    servoIsOpen = true;
+    document.getElementById('servo-btn').className = 'btn btn-warn';
+    document.getElementById('servo-btn').innerHTML = '🔧 Close Flap';
+  } else {
+    sendCmd('SERVO:CLOSE');
+    servoIsOpen = false;
+    document.getElementById('servo-btn').className = 'btn btn-secondary';
+    document.getElementById('servo-btn').innerHTML = '🔧 Open Flap';
+  }
+}
 
+let valveIsOpen = false;
+function toggleValve() {
+  if (!valveIsOpen) {
+    sendCmd('VALVE:OPEN');
+    valveIsOpen = true;
+    document.getElementById('valve-btn').className = 'btn btn-warn';
+    document.getElementById('valve-btn').innerHTML = '🔧 Close Valve';
+  } else {
+    sendCmd('VALVE:CLOSE');
+    valveIsOpen = false;
+    document.getElementById('valve-btn').className = 'btn btn-secondary';
+    document.getElementById('valve-btn').innerHTML = '🔧 Open Valve';
+  }
+}
 window.onload = () => setTimeout(connect, 500);
 </script>
 </body>
