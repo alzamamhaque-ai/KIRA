@@ -1,123 +1,215 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="theme-color" content="#0a1628">
-  <title>KIRA Pet Feeder</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0a1628">
+<title>KIRA Pet Feeder</title>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.1.0/paho-mqtt.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.1.0/paho-mqtt.min.js"></script>
 
-  <style>
-    /* Base Styles */
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: #0a1628; color: #e0e8f0; min-height: 100vh; padding-bottom: 24px;
-    }
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
 
-    /* Header & Connection Status */
-    .header {
-      background: #0d1f35; border-bottom: 1px solid #1e3a5f; padding: 16px 20px;
-      display: flex; align-items: center; justify-content: space-between;
-      position: sticky; top: 0; z-index: 100;
-    }
-    .logo { font-size: 22px; font-weight: 700; color: #4a9eff; letter-spacing: 1px; }
-    .logo span { color: #8899aa; font-weight: 300; font-size: 14px; margin-left: 4px; }
-    .status-container { display: flex; align-items: center; gap: 8px; }
-    .conn-dot { width: 9px; height: 9px; border-radius: 50%; background: #ff4444; transition: 0.3s; }
-    .conn-dot.on { background: #4eff91; box-shadow: 0 0 8px #4eff91; }
-    .conn-label { font-size: 12px; color: #8899aa; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #0a1628;
+    color: #e0e8f0;
+    min-height: 100vh;
+    padding-bottom: 24px;
+  }
 
-    /* Layout */
-    .main { padding: 16px; max-width: 480px; margin: 0 auto; }
-    .card { background: #0d1f35; border: 1px solid #1e3a5f; border-radius: 16px; padding: 18px 20px; margin-bottom: 14px; }
-    .card-title { font-size: 11px; text-transform: uppercase; color: #4a9eff; font-weight: 600; margin-bottom: 14px; letter-spacing: 0.05em; }
+  /* Header */
+  .header {
+    background: #0d1f35;
+    border-bottom: 1px solid #1e3a5f;
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .logo { font-size: 22px; font-weight: 700; color: #4a9eff; letter-spacing: 1px; }
+  .logo span { color: #e0e8f0; font-weight: 300; font-size: 14px; margin-left: 4px; }
+  .conn-dot {
+    width: 9px; height: 9px; border-radius: 50%;
+    background: #ff4444;
+    transition: background 0.3s;
+  }
+  .conn-dot.on { background: #4eff91; box-shadow: 0 0 8px #4eff91; }
+  .conn-label { font-size: 12px; color: #8899aa; }
 
-    /* Bowl Status UI */
-    .bowl-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    .bowl-card { background: #091525; border: 1px solid #1a3050; border-radius: 12px; padding: 16px; text-align: center; }
-    .bowl-icon { font-size: 24px; margin-bottom: 8px; }
-    .bowl-name { font-size: 12px; color: #8899aa; margin-bottom: 8px; }
-    .bowl-bar-bg { background: #0a1628; border-radius: 6px; height: 8px; overflow: hidden; margin-bottom: 8px; }
-    .bowl-bar { height: 100%; border-radius: 6px; background: #4a9eff; transition: width 0.6s ease; width: 0%; }
-    .bowl-bar.low { background: #ff6b35; }
-    .bowl-bar.high { background: #4eff91; }
-    .bowl-pct { font-size: 18px; font-weight: 700; }
+  .main { padding: 16px; max-width: 480px; margin: 0 auto; }
 
-    /* Camera UI */
-    .cam-wrap { 
-      background: #040d1a; border-radius: 12px; min-height: 220px; 
-      display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden;
-    }
-    #snapshot { width: 100%; display: block; }
-    .placeholder { text-align: center; color: #2a4a6a; }
-    .placeholder-icon { font-size: 40px; margin-bottom: 8px; }
+  /* Card UI */
+  .card {
+    background: #0d1f35;
+    border: 1px solid #1e3a5f;
+    border-radius: 16px;
+    padding: 18px 20px;
+    margin-bottom: 14px;
+  }
+  .card-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #4a9eff;
+    font-weight: 600;
+    margin-bottom: 14px;
+  }
 
-    /* Control Buttons */
-    .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
-    .btn { 
-      padding: 14px; border: none; border-radius: 12px; font-weight: 600; cursor: pointer; 
-      display: flex; align-items: center; justify-content: center; gap: 8px; transition: 0.2s;
-    }
-    .btn:active { transform: scale(0.96); }
-    .btn-green { background: #0d4030; color: #4eff91; border: 1px solid #1e6040; }
-    .btn-orange { background: #3d2000; color: #ffaa00; border: 1px solid #5a3000; }
-    .btn-primary { background: #4a9eff; color: #fff; grid-column: 1 / -1; }
+  /* Bowl Indicators */
+  .bowl-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .bowl-card {
+    background: #091525;
+    border: 1px solid #1a3050;
+    border-radius: 12px;
+    padding: 16px;
+    text-align: center;
+  }
+  .bowl-icon { font-size: 28px; margin-bottom: 8px; }
+  .bowl-name { font-size: 12px; color: #8899aa; margin-bottom: 10px; }
+  .bowl-bar-bg {
+    background: #0a1628;
+    border-radius: 6px;
+    height: 8px;
+    overflow: hidden;
+    margin-bottom: 8px;
+  }
+  .bowl-bar {
+    height: 100%;
+    border-radius: 6px;
+    background: #4a9eff;
+    transition: width 0.6s ease;
+    width: 0%;
+  }
+  .bowl-bar.low  { background: #ff6b35; }
+  .bowl-bar.high { background: #4eff91; }
+  .bowl-pct { font-size: 18px; font-weight: 700; color: #e0e8f0; }
+  .bowl-status { font-size: 11px; margin-top: 4px; color: #8899aa; }
 
-    /* System Logs */
-    #log { max-height: 150px; overflow-y: auto; font-family: monospace; font-size: 12px; color: #8899aa; }
-    .log-item { padding: 4px 0; border-bottom: 1px solid #1a3050; }
-    .log-time { color: #4a9eff; margin-right: 8px; }
-    .success { color: #4eff91; }
-    .alert { color: #ff6b35; }
-  </style>
+  /* Camera UI */
+  .cam-wrap {
+    background: #040d1a;
+    border-radius: 12px;
+    overflow: hidden;
+    position: relative;
+    min-height: 200px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 12px;
+  }
+  #snapshot { width: 100%; display: block; border-radius: 12px; }
+  .cam-placeholder { text-align: center; color: #2a4a6a; padding: 40px 20px; }
+  .cam-placeholder .icon { font-size: 40px; margin-bottom: 8px; }
+  .cam-timestamp {
+    position: absolute; bottom: 8px; right: 10px;
+    font-size: 11px; color: rgba(255,255,255,0.6);
+    background: rgba(0,0,0,0.5); padding: 3px 8px; border-radius: 6px;
+  }
+
+  /* Buttons */
+  .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .btn {
+    padding: 14px 12px; border: none; border-radius: 12px;
+    font-size: 14px; font-weight: 600; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 8px; transition: 0.1s;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary   { background: #4a9eff; color: #fff; grid-column: 1 / -1; }
+  .btn-green  { background: #0d4030; color: #4eff91; border: 1px solid #1e6040; }
+  .btn-orange { background: #3d2000; color: #ffaa00; border: 1px solid #5a3000; }
+
+  /* Badges & Power Info */
+  .badge-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  .badge { font-size: 11px; padding: 4px 10px; border-radius: 20px; font-weight: 600; display: flex; align-items: center; gap: 5px; }
+  .badge-dot { width: 6px; height: 6px; border-radius: 50%; }
+  .badge-ok   { background: #0d3020; color: #4eff91; }
+  .badge-ok .badge-dot   { background: #4eff91; }
+  .badge-warn { background: #3d2000; color: #ffaa00; }
+  .badge-warn .badge-dot { background: #ffaa00; }
+  .badge-off  { background: #1a1a2e; color: #8899aa; }
+  .badge-off .badge-dot  { background: #8899aa; }
+
+  .power-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #1a3050; }
+  .power-row:last-child { border-bottom: none; }
+  .power-label { font-size: 13px; color: #8899aa; }
+  .power-value { font-size: 13px; font-weight: 600; color: #e0e8f0; }
+  .power-value.green { color: #4eff91; }
+  .power-value.orange { color: #ffaa00; }
+  .power-value.red { color: #ff6b35; }
+
+  /* Log */
+  #log { max-height: 180px; overflow-y: auto; font-size: 12px; color: #8899aa; }
+  .log-item { padding: 4px 0; border-bottom: 1px solid #0d1f35; }
+  .log-time { color: #4a9eff; margin-right: 6px; font-weight: 600; }
+  .success { color: #4eff91; }
+  .alert { color: #ff6b35; }
+
+  #conn-banner {
+    background: #2a0d0d; border: 1px solid #5a1a1a; border-radius: 10px; padding: 12px 16px;
+    margin-bottom: 14px; font-size: 13px; color: #ff8888; display: none; align-items: center; gap: 10px;
+  }
+  #conn-banner.show { display: flex; }
+</style>
 </head>
 <body>
 
 <div class="header">
   <div class="logo">KIRA <span>Smart Feeder</span></div>
-  <div class="status-container">
+  <div style="display:flex;align-items:center;gap:8px">
     <div class="conn-dot" id="conn-dot"></div>
-    <div id="conn-label" class="conn-label">Connecting...</div>
+    <div class="conn-label" id="conn-label">Connecting...</div>
   </div>
 </div>
 
 <div class="main">
+  <div id="conn-banner">⚠️ <span id="conn-banner-text">Not connected to KIRA</span></div>
+
   <div class="card">
-    <div class="card-title">Storage Levels</div>
+    <div class="card-title">Bowl Status</div>
     <div class="bowl-row">
       <div class="bowl-card">
         <div class="bowl-icon">🍖</div>
-        <div class="bowl-name">Food</div>
+        <div class="bowl-name">Food Bowl</div>
         <div class="bowl-bar-bg"><div class="bowl-bar" id="food-bar"></div></div>
         <div class="bowl-pct" id="food-pct">--</div>
+        <div class="bowl-status" id="food-status">Waiting...</div>
       </div>
       <div class="bowl-card">
         <div class="bowl-icon">💧</div>
-        <div class="bowl-name">Water</div>
+        <div class="bowl-name">Water Bowl</div>
         <div class="bowl-bar-bg"><div class="bowl-bar" id="water-bar"></div></div>
         <div class="bowl-pct" id="water-pct">--</div>
+        <div class="bowl-status" id="water-status">Waiting...</div>
       </div>
+    </div>
+    <div class="badge-row">
+      <div class="badge badge-off" id="servo-badge"><div class="badge-dot"></div> Servo: --</div>
+      <div class="badge badge-off" id="sol-badge"><div class="badge-dot"></div> Valve: --</div>
     </div>
   </div>
 
   <div class="card">
-    <div class="card-title">Live Vision</div>
+    <div class="card-title">Camera</div>
     <div class="cam-wrap">
-      <img id="snapshot" style="display:none">
-      <div id="placeholder" class="placeholder">
-        <div class="placeholder-icon">📷</div>
-        <p>No snapshot available</p>
+      <div class="cam-placeholder" id="cam-placeholder">
+        <div class="icon">📷</div>
+        <p>No snapshot yet</p>
       </div>
+      <img id="snapshot" style="display:none">
+      <div class="cam-timestamp" id="cam-ts" style="display:none"></div>
     </div>
     <button class="btn btn-primary" onclick="sendCmd('SNAPSHOT')">📸 Take Snapshot</button>
   </div>
 
   <div class="card">
-    <div class="card-title">Manual Feed</div>
+    <div class="card-title">Controls</div>
     <div class="btn-row">
       <button class="btn btn-green" onclick="sendCmd('FEED:NOW')">🍖 Feed Now</button>
       <button class="btn btn-orange" onclick="sendCmd('WATER:NOW')">💧 Water Now</button>
@@ -125,13 +217,28 @@
   </div>
 
   <div class="card">
-    <div class="card-title">System Activity</div>
+    <div class="card-title">Power & System</div>
+    <div class="power-row">
+      <div class="power-label">Power source</div>
+      <div class="power-value" id="power-src">--</div>
+    </div>
+    <div class="power-row">
+      <div class="power-label">Battery</div>
+      <div class="power-value" id="power-batt">--</div>
+    </div>
+    <div class="power-row">
+      <div class="power-label">WiFi</div>
+      <div class="power-value" id="wifi-status">--</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Activity Log</div>
     <div id="log"></div>
   </div>
 </div>
 
 <script>
-/** MQTT CONFIGURATION **/
 const BROKER = "0b5088bcba2d4f4383816bdfe8ca662a.s1.eu.hivemq.cloud";
 const PORT = 8884;
 const USER = "NIVARANTECH";
@@ -149,95 +256,122 @@ function connect() {
   }
 
   try {
-    // Determine the correct constructor for the loaded library
-    const MQTTClient = (typeof Paho.MQTT !== 'undefined') ? Paho.MQTT.Client : Paho.Client;
-    
+    // Correct constructor for the library confirmed in your console
+    const MQTTClient = Paho.Client; 
     client = new MQTTClient(BROKER, PORT, "/mqtt", CLIENT);
 
     client.onConnectionLost = (r) => {
       connected = false;
-      updateStatusUI(false, "Disconnected");
+      setConnUI(false, "Disconnected");
       logItem("Connection lost: " + r.errorMessage, "alert");
       setTimeout(connect, 5000);
     };
 
     client.onMessageArrived = (msg) => {
-      handleIncomingData(msg.destinationName, msg.payloadString);
+      handleMessage(msg.destinationName, msg.payloadString);
     };
 
-    const options = {
-      useSSL: true,
-      userName: USER,
-      password: PASS,
+    client.connect({
+      useSSL: true, userName: USER, password: PASS,
       onSuccess: () => {
         connected = true;
-        updateStatusUI(true, "Connected");
+        setConnUI(true, "Connected");
         logItem("Connected to HiveMQ Cloud", "success");
         client.subscribe("kira/sensors");
         client.subscribe("kira/camera/snapshot");
         client.subscribe("kira/status");
       },
       onFailure: (e) => {
-        connected = false;
-        updateStatusUI(false, "Failed");
-        logItem("Login error: " + e.errorMessage, "alert");
+        setConnUI(false, "Login Failed");
+        logItem("Connect failed: " + e.errorMessage, "alert");
         setTimeout(connect, 5000);
       }
-    };
-
-    client.connect(options);
-  } catch (e) {
-    console.error("Initialization error:", e);
-  }
+    });
+  } catch(e) { console.error(e); }
 }
 
-function handleIncomingData(topic, payload) {
+function handleMessage(topic, payload) {
   if (topic === "kira/sensors") {
     try {
-      const data = JSON.parse(payload);
-      if (data.food !== undefined) updateBowl("food", data.food);
-      if (data.water !== undefined) updateBowl("water", data.water);
+      const d = JSON.parse(payload);
+      updateSensors(d);
     } catch(e) { console.error("JSON Parse Error"); }
   } 
   else if (topic === "kira/camera/snapshot") {
     const img = document.getElementById("snapshot");
     img.src = "data:image/jpeg;base64," + payload;
     img.style.display = "block";
-    document.getElementById("placeholder").style.display = "none";
-    logItem("Snapshot updated");
+    document.getElementById("cam-placeholder").style.display = "none";
+    document.getElementById("cam-ts").style.display = "block";
+    document.getElementById("cam-ts").innerText = new Date().toLocaleTimeString();
+    logItem("Snapshot received", "success");
   }
 }
 
-function updateBowl(id, val) {
-  const bar = document.getElementById(id + "-bar");
-  const pct = document.getElementById(id + "-pct");
-  bar.style.width = val + "%";
-  pct.innerText = val + "%";
-  bar.className = "bowl-bar " + (val < 20 ? "low" : "high");
+function updateSensors(d) {
+  if (d.food !== undefined) {
+    const bar = document.getElementById("food-bar");
+    bar.style.width = d.food + "%";
+    bar.className = "bowl-bar " + (d.food <= 20 ? "low" : "high");
+    document.getElementById("food-pct").innerText = d.food + "%";
+    document.getElementById("food-status").innerText = d.food <= 20 ? "⚠ Refill needed" : "Good";
+  }
+  if (d.water !== undefined) {
+    const bar = document.getElementById("water-bar");
+    bar.style.width = d.water + "%";
+    bar.className = "bowl-bar " + (d.water <= 20 ? "low" : "high");
+    document.getElementById("water-pct").innerText = d.water + "%";
+    document.getElementById("water-status").innerText = d.water <= 20 ? "⚠ Refill needed" : "Good";
+  }
+  if (d.battery !== undefined) {
+    const b = document.getElementById("power-batt");
+    b.innerText = d.battery + "%";
+    b.className = "power-value " + (d.battery <= 25 ? "red" : "green");
+  }
+  if (d.wall !== undefined) {
+    const p = document.getElementById("power-src");
+    p.innerText = d.wall ? "Wall socket" : "Battery";
+    p.className = "power-value " + (d.wall ? "green" : "orange");
+  }
+  if (d.wifi !== undefined) {
+    const w = document.getElementById("wifi-status");
+    w.innerText = d.wifi ? "Connected" : "Offline";
+    w.className = "power-value " + (d.wifi ? "green" : "red");
+  }
+  if (d.servo !== undefined) {
+    const s = document.getElementById("servo-badge");
+    s.innerHTML = `<div class="badge-dot"></div> Servo: ${d.servo}`;
+    s.className = "badge " + (d.servo === "open" ? "badge-warn" : "badge-ok");
+  }
+  if (d.solenoid !== undefined) {
+    const s = document.getElementById("sol-badge");
+    s.innerHTML = `<div class="badge-dot"></div> Valve: ${d.solenoid}`;
+    s.className = "badge " + (d.solenoid === "open" ? "badge-warn" : "badge-ok");
+  }
 }
 
 function sendCmd(cmd) {
   if (!connected) return logItem("Not connected", "alert");
-  const message = new Paho.Message(cmd);
-  message.destinationName = "kira/command";
-  client.send(message);
-  logItem("Command Sent: " + cmd);
+  const msg = new Paho.Message(cmd);
+  msg.destinationName = "kira/command";
+  client.send(msg);
+  logItem("Sent: " + cmd);
 }
 
-function updateStatusUI(isOk, text) {
-  document.getElementById("conn-dot").className = "conn-dot" + (isOk ? " on" : "");
-  document.getElementById("conn-label").innerText = text;
+function setConnUI(ok, txt) {
+  document.getElementById("conn-dot").className = "conn-dot" + (ok ? " on" : "");
+  document.getElementById("conn-label").innerText = txt;
+  document.getElementById("conn-banner").className = ok ? "" : "show";
 }
 
-function logItem(msg, type) {
+function logItem(m, type) {
   const log = document.getElementById("log");
   const div = document.createElement("div");
-  div.className = "log-item" + (type ? " " + type : "");
-  div.innerHTML = `<span class="log-time">${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'})}</span> ${msg}`;
+  div.className = "log-item " + (type || "");
+  div.innerHTML = `<span class="log-time">${new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span> ${m}`;
   log.insertBefore(div, log.firstChild);
 }
 
-// Start connection sequence
 window.onload = () => setTimeout(connect, 500);
 </script>
 </body>
