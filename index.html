@@ -1,245 +1,190 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="theme-color" content="#0a1628">
-<title>KIRA Pet Feeder</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.1.0/paho-mqtt.min.js"></script>
-<style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#0a1628">
+  <title>KIRA Pet Feeder</title>
 
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    background: #0a1628;
-    color: #e0e8f0;
-    min-height: 100vh;
-    padding-bottom: 24px;
-  }
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.1.0/paho-mqtt.min.js"></script>
 
-  /* ── Header ── */
-  .header {
-    background: #0d1f35;
-    border-bottom: 1px solid #1e3a5f;
-    padding: 16px 20px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    position: sticky;
-    top: 0;
-    z-index: 100;
-  }
-  .header-left { display: flex; align-items: center; gap: 10px; }
-  .logo { font-size: 22px; font-weight: 700; color: #4a9eff; letter-spacing: 1px; }
-  .logo span { color: #e0e8f0; font-weight: 300; font-size: 14px; margin-left: 4px; }
-  .conn-dot {
-    width: 9px; height: 9px; border-radius: 50%;
-    background: #ff4444;
-    transition: background 0.3s;
-  }
-  .conn-dot.on { background: #4eff91; }
-  .conn-label { font-size: 12px; color: #8899aa; }
+  <style>
+    /* Reset & Base */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
 
-  /* ── Main layout ── */
-  .main { padding: 16px; max-width: 480px; margin: 0 auto; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0a1628;
+      color: #e0e8f0;
+      min-height: 100vh;
+      padding-bottom: 24px;
+    }
 
-  /* ── Card ── */
-  .card {
-    background: #0d1f35;
-    border: 1px solid #1e3a5f;
-    border-radius: 16px;
-    padding: 18px 20px;
-    margin-bottom: 14px;
-  }
-  .card-title {
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: #4a9eff;
-    font-weight: 600;
-    margin-bottom: 14px;
-  }
+    /* Header */
+    .header {
+      background: #0d1f35;
+      border-bottom: 1px solid #1e3a5f;
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header-left { display: flex; align-items: center; gap: 10px; }
+    .logo { font-size: 22px; font-weight: 700; color: #4a9eff; letter-spacing: 1px; }
+    .logo span { color: #e0e8f0; font-weight: 300; font-size: 14px; margin-left: 4px; }
+    .conn-dot {
+      width: 9px; height: 9px; border-radius: 50%;
+      background: #ff4444;
+      transition: background 0.3s;
+    }
+    .conn-dot.on { background: #4eff91; }
+    .conn-label { font-size: 12px; color: #8899aa; }
 
-  /* ── Status row ── */
-  .status-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-  }
-  .stat-box {
-    background: #091525;
-    border: 1px solid #1a3050;
-    border-radius: 12px;
-    padding: 14px;
-    text-align: center;
-  }
-  .stat-label { font-size: 11px; color: #8899aa; margin-bottom: 6px; }
-  .stat-value {
-    font-size: 22px;
-    font-weight: 700;
-    color: #e0e8f0;
-    line-height: 1;
-  }
-  .stat-unit { font-size: 12px; color: #8899aa; font-weight: 400; }
+    /* Layout */
+    .main { padding: 16px; max-width: 480px; margin: 0 auto; }
 
-  /* ── Bowl indicators ── */
-  .bowl-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  .bowl-card {
-    background: #091525;
-    border: 1px solid #1a3050;
-    border-radius: 12px;
-    padding: 16px;
-    text-align: center;
-  }
-  .bowl-icon { font-size: 28px; margin-bottom: 8px; }
-  .bowl-name { font-size: 12px; color: #8899aa; margin-bottom: 10px; }
-  .bowl-bar-bg {
-    background: #0a1628;
-    border-radius: 6px;
-    height: 8px;
-    overflow: hidden;
-    margin-bottom: 8px;
-  }
-  .bowl-bar {
-    height: 100%;
-    border-radius: 6px;
-    background: #4a9eff;
-    transition: width 0.6s ease, background 0.3s;
-    width: 0%;
-  }
-  .bowl-bar.low  { background: #ff6b35; }
-  .bowl-bar.mid  { background: #ffaa00; }
-  .bowl-bar.high { background: #4eff91; }
-  .bowl-pct { font-size: 18px; font-weight: 700; color: #e0e8f0; }
-  .bowl-status { font-size: 11px; margin-top: 4px; color: #8899aa; }
+    /* Cards */
+    .card {
+      background: #0d1f35;
+      border: 1px solid #1e3a5f;
+      border-radius: 16px;
+      padding: 18px 20px;
+      margin-bottom: 14px;
+    }
+    .card-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #4a9eff;
+      font-weight: 600;
+      margin-bottom: 14px;
+    }
 
-  /* ── Camera ── */
-  .cam-wrap {
-    background: #040d1a;
-    border-radius: 12px;
-    overflow: hidden;
-    position: relative;
-    min-height: 200px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-bottom: 12px;
-  }
-  #snapshot {
-    width: 100%;
-    display: block;
-    border-radius: 12px;
-  }
-  .cam-placeholder {
-    text-align: center;
-    color: #2a4a6a;
-    padding: 40px 20px;
-  }
-  .cam-placeholder .icon { font-size: 40px; margin-bottom: 8px; }
-  .cam-placeholder p { font-size: 13px; }
-  .cam-timestamp {
-    position: absolute;
-    bottom: 8px;
-    right: 10px;
-    font-size: 11px;
-    color: rgba(255,255,255,0.6);
-    background: rgba(0,0,0,0.5);
-    padding: 3px 8px;
-    border-radius: 6px;
-  }
+    /* Connection banner (Fixed CSS Selector) */
+    #conn-banner {
+      background: #2a0d0d;
+      border: 1px solid #5a1a1a;
+      border-radius: 10px;
+      padding: 12px 16px;
+      margin-bottom: 14px;
+      font-size: 13px;
+      color: #ff8888;
+      display: none; /* Hidden by default */
+      align-items: center;
+      gap: 10px;
+    }
+    #conn-banner.show { display: flex !important; }
 
-  /* ── Buttons ── */
-  .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .btn {
-    padding: 14px 12px;
-    border: none;
-    border-radius: 12px;
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: opacity 0.15s, transform 0.1s;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-  }
-  .btn:active { transform: scale(0.97); opacity: 0.85; }
-  .btn-primary   { background: #4a9eff; color: #fff; }
-  .btn-secondary { background: #0d3060; color: #4a9eff; border: 1px solid #1e4a80; }
-  .btn-green  { background: #0d4030; color: #4eff91; border: 1px solid #1e6040; }
-  .btn-orange { background: #3d2000; color: #ffaa00; border: 1px solid #5a3000; }
-  .btn-full { grid-column: 1 / -1; }
-  .btn-icon { font-size: 18px; }
+    /* Bowl Indicators */
+    .bowl-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .bowl-card {
+      background: #091525;
+      border: 1px solid #1a3050;
+      border-radius: 12px;
+      padding: 16px;
+      text-align: center;
+    }
+    .bowl-icon { font-size: 28px; margin-bottom: 8px; }
+    .bowl-name { font-size: 12px; color: #8899aa; margin-bottom: 10px; }
+    .bowl-bar-bg {
+      background: #0a1628;
+      border-radius: 6px;
+      height: 8px;
+      overflow: hidden;
+      margin-bottom: 8px;
+    }
+    .bowl-bar {
+      height: 100%;
+      border-radius: 6px;
+      background: #4a9eff;
+      transition: width 0.6s ease, background 0.3s;
+      width: 0%;
+    }
+    .bowl-bar.low  { background: #ff6b35; }
+    .bowl-bar.mid  { background: #ffaa00; }
+    .bowl-bar.high { background: #4eff91; }
+    .bowl-pct { font-size: 18px; font-weight: 700; color: #e0e8f0; }
+    .bowl-status { font-size: 11px; margin-top: 4px; color: #8899aa; }
 
-  /* ── State badges ── */
-  .badge-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
-  .badge {
-    font-size: 11px;
-    padding: 4px 10px;
-    border-radius: 20px;
-    font-weight: 600;
-    display: flex;
-    align-items: center;
-    gap: 5px;
-  }
-  .badge-dot { width: 6px; height: 6px; border-radius: 50%; }
-  .badge-ok   { background: #0d3020; color: #4eff91; }
-  .badge-ok .badge-dot   { background: #4eff91; }
-  .badge-warn { background: #3d2000; color: #ffaa00; }
-  .badge-warn .badge-dot { background: #ffaa00; }
-  .badge-off  { background: #1a1a2e; color: #8899aa; }
-  .badge-off .badge-dot  { background: #8899aa; }
+    /* Camera */
+    .cam-wrap {
+      background: #040d1a;
+      border-radius: 12px;
+      overflow: hidden;
+      position: relative;
+      min-height: 200px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 12px;
+    }
+    #snapshot { width: 100%; display: block; border-radius: 12px; }
+    .cam-placeholder { text-align: center; color: #2a4a6a; padding: 40px 20px; }
+    .cam-placeholder .icon { font-size: 40px; margin-bottom: 8px; }
+    .cam-placeholder p { font-size: 13px; }
+    .cam-timestamp {
+      position: absolute; bottom: 8px; right: 10px; font-size: 11px;
+      color: rgba(255,255,255,0.6); background: rgba(0,0,0,0.5);
+      padding: 3px 8px; border-radius: 6px;
+    }
 
-  /* ── Power info ── */
-  .power-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 10px 0;
-    border-bottom: 1px solid #1a3050;
-  }
-  .power-row:last-child { border-bottom: none; padding-bottom: 0; }
-  .power-label { font-size: 13px; color: #8899aa; }
-  .power-value { font-size: 13px; font-weight: 600; color: #e0e8f0; }
-  .power-value.green { color: #4eff91; }
-  .power-value.orange { color: #ffaa00; }
-  .power-value.red { color: #ff6b35; }
+    /* Buttons */
+    .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .btn {
+      padding: 14px 12px; border: none; border-radius: 12px;
+      font-size: 14px; font-weight: 600; cursor: pointer;
+      transition: opacity 0.15s, transform 0.1s;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    .btn:active { transform: scale(0.97); opacity: 0.85; }
+    .btn-primary   { background: #4a9eff; color: #fff; }
+    .btn-secondary { background: #0d3060; color: #4a9eff; border: 1px solid #1e4a80; }
+    .btn-green  { background: #0d4030; color: #4eff91; border: 1px solid #1e6040; }
+    .btn-orange { background: #3d2000; color: #ffaa00; border: 1px solid #5a3000; }
+    .btn-full { grid-column: 1 / -1; }
+    .btn-icon { font-size: 18px; }
 
-  /* ── Activity log ── */
-  #log {
-    max-height: 180px;
-    overflow-y: auto;
-    font-size: 12px;
-    color: #8899aa;
-    line-height: 1.6;
-  }
-  .log-item { padding: 4px 0; border-bottom: 1px solid #0d1f35; }
-  .log-item:last-child { border-bottom: none; }
-  .log-time { color: #4a9eff; margin-right: 6px; font-weight: 600; }
-  .log-item.alert { color: #ff6b35; }
-  .log-item.success { color: #4eff91; }
+    /* Badges */
+    .badge-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+    .badge {
+      font-size: 11px; padding: 4px 10px; border-radius: 20px;
+      font-weight: 600; display: flex; align-items: center; gap: 5px;
+    }
+    .badge-dot { width: 6px; height: 6px; border-radius: 50%; }
+    .badge-ok   { background: #0d3020; color: #4eff91; }
+    .badge-ok .badge-dot   { background: #4eff91; }
+    .badge-warn { background: #3d2000; color: #ffaa00; }
+    .badge-warn .badge-dot { background: #ffaa00; }
+    .badge-off  { background: #1a1a2e; color: #8899aa; }
+    .badge-off .badge-dot  { background: #8899aa; }
 
-  /* ── Connection banner ── */
-  #conn-banner {
-    background: #2a0d0d;
-    border: 1px solid #5a1a1a;
-    border-radius: 10px;
-    padding: 12px 16px;
-    margin-bottom: 14px;
-    font-size: 13px;
-    color: #ff8888;
-    display: none;
-    align-items: center;
-    gap: 10px;
-  }
-  #conn-banner.show { display: flex; }
-</style>
+    /* System Rows */
+    .power-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 0; border-bottom: 1px solid #1a3050;
+    }
+    .power-row:last-child { border-bottom: none; }
+    .power-label { font-size: 13px; color: #8899aa; }
+    .power-value { font-size: 13px; font-weight: 600; color: #e0e8f0; }
+    .power-value.green { color: #4eff91; }
+    .power-value.orange { color: #ffaa00; }
+    .power-value.red { color: #ff6b35; }
+
+    /* Log */
+    #log { max-height: 180px; overflow-y: auto; font-size: 12px; color: #8899aa; line-height: 1.6; }
+    .log-item { padding: 4px 0; border-bottom: 1px solid #0d1f35; }
+    .log-time { color: #4a9eff; margin-right: 6px; font-weight: 600; }
+    .log-item.alert { color: #ff6b35; }
+    .log-item.success { color: #4eff91; }
+  </style>
 </head>
 <body>
 
-<!-- Header -->
 <div class="header">
   <div class="header-left">
     <div class="logo">KIRA <span>Smart Feeder</span></div>
@@ -251,47 +196,35 @@
 </div>
 
 <div class="main">
-
-  <!-- Connection banner -->
-  <div class="conn-banner" id="conn-banner">
+  <div id="conn-banner">
     <span>⚠️</span>
-    <span id="conn-banner-text">Not connected to KIRA</span>
+    <span id="conn-banner-text">Connecting to KIRA...</span>
   </div>
 
-  <!-- Bowl levels -->
   <div class="card">
     <div class="card-title">Bowl Status</div>
     <div class="bowl-row">
       <div class="bowl-card">
         <div class="bowl-icon">🍖</div>
         <div class="bowl-name">Food Bowl</div>
-        <div class="bowl-bar-bg">
-          <div class="bowl-bar" id="food-bar"></div>
-        </div>
+        <div class="bowl-bar-bg"><div class="bowl-bar" id="food-bar"></div></div>
         <div class="bowl-pct" id="food-pct">--</div>
         <div class="bowl-status" id="food-status">Waiting...</div>
       </div>
       <div class="bowl-card">
         <div class="bowl-icon">💧</div>
         <div class="bowl-name">Water Bowl</div>
-        <div class="bowl-bar-bg">
-          <div class="bowl-bar" id="water-bar"></div>
-        </div>
+        <div class="bowl-bar-bg"><div class="bowl-bar" id="water-bar"></div></div>
         <div class="bowl-pct" id="water-pct">--</div>
         <div class="bowl-status" id="water-status">Waiting...</div>
       </div>
     </div>
     <div class="badge-row">
-      <div class="badge badge-off" id="servo-badge">
-        <div class="badge-dot"></div> Servo: --
-      </div>
-      <div class="badge badge-off" id="sol-badge">
-        <div class="badge-dot"></div> Valve: --
-      </div>
+      <div class="badge badge-off" id="servo-badge"><div class="badge-dot"></div> Servo: --</div>
+      <div class="badge badge-off" id="sol-badge"><div class="badge-dot"></div> Valve: --</div>
     </div>
   </div>
 
-  <!-- Camera -->
   <div class="card">
     <div class="card-title">Camera</div>
     <div class="cam-wrap" id="cam-wrap">
@@ -309,7 +242,6 @@
     </div>
   </div>
 
-  <!-- Controls -->
   <div class="card">
     <div class="card-title">Controls</div>
     <div class="btn-row">
@@ -322,7 +254,6 @@
     </div>
   </div>
 
-  <!-- Power & System -->
   <div class="card">
     <div class="card-title">Power &amp; System</div>
     <div class="power-row">
@@ -339,22 +270,18 @@
     </div>
   </div>
 
-  <!-- Activity log -->
   <div class="card">
     <div class="card-title">Activity Log</div>
     <div id="log">
-      <div class="log-item">
-        <span class="log-time">--:--</span>Waiting for connection...
-      </div>
+      <div class="log-item"><span class="log-time">--:--</span>Connecting...</div>
     </div>
   </div>
-
 </div>
 
 <script>
-// ─── MQTT config ─────────────────────────────────────────────────────────────
+// MQTT config
 const BROKER   = "0b5088bcba2d4f4383816bdfe8ca662a.s1.eu.hivemq.cloud";
-const PORT     = 8884;  // WSS port
+const PORT     = 8884; 
 const USER     = "NIVARANTECH";
 const PASS     = "Personal@1";
 const CLIENT   = "KIRA-WebUI-" + Math.random().toString(36).substr(2, 6);
@@ -368,218 +295,130 @@ const T_ALERT   = "kira/alert";
 let client = null;
 let connected = false;
 
-// ─── Connect ─────────────────────────────────────────────────────────────────
 function connect() {
-  if (typeof Paho === 'undefined') {
-    logItem("Paho MQTT library not loaded", "alert");
+  // Check if library is ready
+  if (typeof Paho === 'undefined' || !Paho.MQTT) {
+    logItem("Waiting for MQTT library...", "alert");
+    setTimeout(connect, 1000);
     return;
   }
 
-  client = new Paho.MQTT.Client(BROKER, PORT, "/mqtt", CLIENT);
+  try {
+    client = new Paho.MQTT.Client(BROKER, PORT, "/mqtt", CLIENT);
 
-  client.onConnectionLost = (r) => {
-    connected = false;
-    setConnUI(false, "Disconnected — retrying...");
-    logItem("Connection lost: " + r.errorMessage, "alert");
-    setTimeout(connect, 4000);
-  };
-
-  client.onMessageArrived = (msg) => {
-    handleMessage(msg.destinationName, msg.payloadString);
-  };
-
-  client.connect({
-    useSSL: true,
-    userName: USER,
-    password: PASS,
-    keepAliveInterval: 30,
-    onSuccess: () => {
-      connected = true;
-      setConnUI(true, "Connected");
-      logItem("Connected to KIRA", "success");
-      client.subscribe(T_STATUS);
-      client.subscribe(T_SNAP);
-      client.subscribe(T_SENSORS);
-      client.subscribe(T_ALERT);
-      // Request status immediately
-      publish(T_CMD, "STATUS");
-    },
-    onFailure: (e) => {
+    client.onConnectionLost = (r) => {
       connected = false;
-      setConnUI(false, "Connection failed");
-      logItem("Connect failed: " + e.errorMessage, "alert");
-      setTimeout(connect, 5000);
-    }
-  });
+      setConnUI(false, "Disconnected — retrying...");
+      logItem("Connection lost: " + r.errorMessage, "alert");
+      setTimeout(connect, 4000);
+    };
+
+    client.onMessageArrived = (msg) => {
+      handleMessage(msg.destinationName, msg.payloadString);
+    };
+
+    client.connect({
+      useSSL: true,
+      userName: USER,
+      password: PASS,
+      keepAliveInterval: 30,
+      onSuccess: () => {
+        connected = true;
+        setConnUI(true, "Connected");
+        logItem("Connected to KIRA", "success");
+        client.subscribe(T_STATUS);
+        client.subscribe(T_SNAP);
+        client.subscribe(T_SENSORS);
+        client.subscribe(T_ALERT);
+        publish(T_CMD, "STATUS");
+      },
+      onFailure: (e) => {
+        connected = false;
+        setConnUI(false, "Connection failed");
+        logItem("Connect failed: " + e.errorMessage, "alert");
+        setTimeout(connect, 5000);
+      }
+    });
+  } catch(e) {
+    console.error("MQTT Setup Error:", e);
+  }
 }
 
-// ─── Handle incoming messages ─────────────────────────────────────────────────
 function handleMessage(topic, payload) {
   if (topic === T_SENSORS) {
-    try {
-      const d = JSON.parse(payload);
-      updateSensors(d);
-    } catch(e) { console.error("Sensor parse error", e); }
-  }
-  else if (topic === T_SNAP) {
+    try { updateSensors(JSON.parse(payload)); } catch(e) {}
+  } else if (topic === T_SNAP) {
     showSnapshot(payload);
-  }
-  else if (topic === T_ALERT) {
-    try {
-      const d = JSON.parse(payload);
-      logItem("ALERT: " + d.alert, "alert");
-    } catch(e) { logItem("Alert: " + payload, "alert"); }
-  }
-  else if (topic === T_STATUS) {
-    try {
-      const d = JSON.parse(payload);
-      logItem(d.status || payload, "success");
-    } catch(e) { logItem(payload); }
+  } else if (topic === T_ALERT) {
+    logItem("ALERT: " + payload, "alert");
+  } else if (topic === T_STATUS) {
+    logItem("Status: " + payload, "success");
   }
 }
 
-// ─── Update sensor display ───────────────────────────────────────────────────
 function updateSensors(d) {
-  // Food bowl
-  if (d.food !== undefined && d.food >= 0) {
-    const fp = d.food;
-    const fbar = document.getElementById("food-bar");
-    const fclass = fp <= 20 ? "low" : fp <= 50 ? "mid" : "high";
-    fbar.style.width = fp + "%";
-    fbar.className = "bowl-bar " + fclass;
-    document.getElementById("food-pct").textContent = fp + "%";
-    document.getElementById("food-status").textContent =
-      fp <= 20 ? "⚠ Refill needed" : fp <= 50 ? "Getting low" : "Good";
+  if (d.food !== undefined) {
+    const el = document.getElementById("food-bar");
+    el.style.width = d.food + "%";
+    el.className = "bowl-bar " + (d.food <= 20 ? "low" : d.food <= 50 ? "mid" : "high");
+    document.getElementById("food-pct").textContent = d.food + "%";
   }
-
-  // Water bowl
-  if (d.water !== undefined && d.water >= 0) {
-    const wp = d.water;
-    const wbar = document.getElementById("water-bar");
-    const wclass = wp <= 20 ? "low" : wp <= 50 ? "mid" : "high";
-    wbar.style.width = wp + "%";
-    wbar.className = "bowl-bar " + wclass;
-    document.getElementById("water-pct").textContent = wp + "%";
-    document.getElementById("water-status").textContent =
-      wp <= 20 ? "⚠ Refill needed" : wp <= 50 ? "Getting low" : "Good";
+  if (d.water !== undefined) {
+    const el = document.getElementById("water-bar");
+    el.style.width = d.water + "%";
+    el.className = "bowl-bar " + (d.water <= 20 ? "low" : d.water <= 50 ? "mid" : "high");
+    document.getElementById("water-pct").textContent = d.water + "%";
   }
-
-  // Battery
   if (d.battery !== undefined) {
-    const bp = d.battery;
-    const bEl = document.getElementById("power-batt");
-    bEl.textContent = bp + "%";
-    bEl.className = "power-value " + (bp <= 25 ? "red" : bp <= 50 ? "orange" : "green");
-  }
-
-  // Power source
-  if (d.wall !== undefined) {
-    const src = document.getElementById("power-src");
-    src.textContent = d.wall ? "Wall socket" : "Battery";
-    src.className = "power-value " + (d.wall ? "green" : "orange");
-  }
-
-  // WiFi status
-  if (d.wifi !== undefined) {
-    const ws = document.getElementById("wifi-status");
-    ws.textContent = d.wifi ? "Connected" : "Offline";
-    ws.className = "power-value " + (d.wifi ? "green" : "red");
-  }
-
-  // Servo state
-  const servoBadge = document.getElementById("servo-badge");
-  if (d.servo !== undefined) {
-    servoBadge.textContent = "Servo: " + d.servo;
-    servoBadge.className = "badge " + (d.servo === "open" ? "badge-warn" : "badge-ok");
-    servoBadge.innerHTML = '<div class="badge-dot"></div> Servo: ' + d.servo;
-  }
-
-  // Solenoid state
-  const solBadge = document.getElementById("sol-badge");
-  if (d.solenoid !== undefined) {
-    solBadge.className = "badge " + (d.solenoid === "open" ? "badge-warn" : "badge-ok");
-    solBadge.innerHTML = '<div class="badge-dot"></div> Valve: ' + d.solenoid;
+    const b = document.getElementById("power-batt");
+    b.textContent = d.battery + "%";
+    b.className = "power-value " + (d.battery <= 25 ? "red" : "green");
   }
 }
 
-// ─── Show snapshot ────────────────────────────────────────────────────────────
 function showSnapshot(b64) {
-  if (!b64 || b64.length < 100) return;
   const img = document.getElementById("snapshot");
-  const placeholder = document.getElementById("cam-placeholder");
-  const ts = document.getElementById("cam-ts");
-
   img.src = "data:image/jpeg;base64," + b64;
   img.style.display = "block";
-  placeholder.style.display = "none";
-  ts.style.display = "block";
-  ts.textContent = new Date().toLocaleTimeString();
-
-  logItem("Snapshot received", "success");
+  document.getElementById("cam-placeholder").style.display = "none";
+  document.getElementById("cam-ts").style.display = "block";
+  document.getElementById("cam-ts").textContent = new Date().toLocaleTimeString();
 }
 
-// ─── Commands ─────────────────────────────────────────────────────────────────
 function sendCmd(cmd) {
-  if (!connected) {
-    logItem("Not connected — command not sent", "alert");
-    return;
-  }
+  if (!connected) return logItem("Not connected", "alert");
   publish(T_CMD, cmd);
-  logItem("Command sent: " + cmd);
+  logItem("Sent: " + cmd);
 }
 
-function takeSnapshot() {
-  sendCmd("SNAPSHOT");
-  logItem("Snapshot requested...");
-}
+function takeSnapshot() { sendCmd("SNAPSHOT"); }
 
 function publish(topic, payload) {
   if (!client || !connected) return;
   const msg = new Paho.MQTT.Message(payload);
   msg.destinationName = topic;
-  msg.qos = 0;
   client.send(msg);
 }
 
-// ─── UI helpers ──────────────────────────────────────────────────────────────
 function setConnUI(ok, label) {
   document.getElementById("conn-dot").className = "conn-dot" + (ok ? " on" : "");
   document.getElementById("conn-label").textContent = label;
   const banner = document.getElementById("conn-banner");
-  if (!ok) {
-    banner.classList.add("show");
-    document.getElementById("conn-banner-text").textContent = label;
-  } else {
-    banner.classList.remove("show");
-  }
+  if (!ok) banner.classList.add("show");
+  else banner.classList.remove("show");
 }
 
 function logItem(msg, type) {
   const log = document.getElementById("log");
-  const now = new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
   const div = document.createElement("div");
   div.className = "log-item" + (type ? " " + type : "");
-  div.innerHTML = '<span class="log-time">' + now + '</span>' + escapeHtml(msg);
-  // Prepend to show newest first
+  div.innerHTML = `<span class="log-time">${new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</span> ${msg}`;
   log.insertBefore(div, log.firstChild);
-  // Keep max 30 entries
-  while (log.children.length > 30) log.removeChild(log.lastChild);
 }
 
-function escapeHtml(s) {
-  return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
-}
-
-// ─── Start ────────────────────────────────────────────────────────────────────
 window.addEventListener("load", () => {
-  setConnUI(false, "Connecting...");
-  // Wait for Paho to load then connect
   setTimeout(connect, 500);
 });
 </script>
-
-<!-- Paho MQTT client -->
-
-
 </body>
 </html>
