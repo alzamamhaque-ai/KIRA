@@ -8,417 +8,195 @@
   <meta name="theme-color" content="#0a1628">
   <title>KIRA Pet Feeder</title>
 
-  <script src="https://unpkg.com/paho-mqtt@1.1.0/paho-mqtt.js"></script>
+  <script src="paho-mqtt.js"></script>
 
   <style>
-    /* Reset & Base */
     * { box-sizing: border-box; margin: 0; padding: 0; }
-
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: #0a1628;
-      color: #e0e8f0;
-      min-height: 100vh;
-      padding-bottom: 24px;
+      background: #0a1628; color: #e0e8f0; min-height: 100vh; padding-bottom: 24px;
     }
-
-    /* Header */
     .header {
-      background: #0d1f35;
-      border-bottom: 1px solid #1e3a5f;
-      padding: 16px 20px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      position: sticky;
-      top: 0;
-      z-index: 100;
+      background: #0d1f35; border-bottom: 1px solid #1e3a5f; padding: 16px 20px;
+      display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top: 0; z-index: 100;
     }
-    .header-left { display: flex; align-items: center; gap: 10px; }
     .logo { font-size: 22px; font-weight: 700; color: #4a9eff; letter-spacing: 1px; }
     .logo span { color: #e0e8f0; font-weight: 300; font-size: 14px; margin-left: 4px; }
-    .conn-dot {
-      width: 9px; height: 9px; border-radius: 50%;
-      background: #ff4444;
-      transition: background 0.3s;
-    }
+    .conn-dot { width: 9px; height: 9px; border-radius: 50%; background: #ff4444; transition: background 0.3s; }
     .conn-dot.on { background: #4eff91; }
     .conn-label { font-size: 12px; color: #8899aa; }
-
-    /* Layout */
     .main { padding: 16px; max-width: 480px; margin: 0 auto; }
-
-    /* Cards */
-    .card {
-      background: #0d1f35;
-      border: 1px solid #1e3a5f;
-      border-radius: 16px;
-      padding: 18px 20px;
-      margin-bottom: 14px;
-    }
-    .card-title {
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: #4a9eff;
-      font-weight: 600;
-      margin-bottom: 14px;
-    }
-
-    /* Connection banner (Fixed CSS Selector) */
+    .card { background: #0d1f35; border: 1px solid #1e3a5f; border-radius: 16px; padding: 18px 20px; margin-bottom: 14px; }
+    .card-title { font-size: 11px; text-transform: uppercase; color: #4a9eff; font-weight: 600; margin-bottom: 14px; }
+    
     #conn-banner {
-      background: #2a0d0d;
-      border: 1px solid #5a1a1a;
-      border-radius: 10px;
-      padding: 12px 16px;
-      margin-bottom: 14px;
-      font-size: 13px;
-      color: #ff8888;
-      display: none; /* Hidden by default */
-      align-items: center;
-      gap: 10px;
+      background: #2a0d0d; border: 1px solid #5a1a1a; border-radius: 10px; padding: 12px 16px;
+      margin-bottom: 14px; font-size: 13px; color: #ff8888; display: none; align-items: center; gap: 10px;
     }
     #conn-banner.show { display: flex !important; }
 
-    /* Bowl Indicators */
     .bowl-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    .bowl-card {
-      background: #091525;
-      border: 1px solid #1a3050;
-      border-radius: 12px;
-      padding: 16px;
-      text-align: center;
-    }
-    .bowl-icon { font-size: 28px; margin-bottom: 8px; }
-    .bowl-name { font-size: 12px; color: #8899aa; margin-bottom: 10px; }
-    .bowl-bar-bg {
-      background: #0a1628;
-      border-radius: 6px;
-      height: 8px;
-      overflow: hidden;
-      margin-bottom: 8px;
-    }
-    .bowl-bar {
-      height: 100%;
-      border-radius: 6px;
-      background: #4a9eff;
-      transition: width 0.6s ease, background 0.3s;
-      width: 0%;
-    }
-    .bowl-bar.low  { background: #ff6b35; }
-    .bowl-bar.mid  { background: #ffaa00; }
+    .bowl-card { background: #091525; border: 1px solid #1a3050; border-radius: 12px; padding: 16px; text-align: center; }
+    .bowl-bar-bg { background: #0a1628; border-radius: 6px; height: 8px; overflow: hidden; margin-bottom: 8px; }
+    .bowl-bar { height: 100%; border-radius: 6px; background: #4a9eff; transition: width 0.6s ease; width: 0%; }
+    .bowl-bar.low { background: #ff6b35; }
     .bowl-bar.high { background: #4eff91; }
-    .bowl-pct { font-size: 18px; font-weight: 700; color: #e0e8f0; }
-    .bowl-status { font-size: 11px; margin-top: 4px; color: #8899aa; }
 
-    /* Camera */
-    .cam-wrap {
-      background: #040d1a;
-      border-radius: 12px;
-      overflow: hidden;
-      position: relative;
-      min-height: 200px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-bottom: 12px;
-    }
-    #snapshot { width: 100%; display: block; border-radius: 12px; }
-    .cam-placeholder { text-align: center; color: #2a4a6a; padding: 40px 20px; }
-    .cam-placeholder .icon { font-size: 40px; margin-bottom: 8px; }
-    .cam-placeholder p { font-size: 13px; }
-    .cam-timestamp {
-      position: absolute; bottom: 8px; right: 10px; font-size: 11px;
-      color: rgba(255,255,255,0.6); background: rgba(0,0,0,0.5);
-      padding: 3px 8px; border-radius: 6px;
-    }
-
-    /* Buttons */
+    .cam-wrap { background: #040d1a; border-radius: 12px; min-height: 200px; display: flex; align-items: center; justify-content: center; position: relative; }
+    #snapshot { width: 100%; border-radius: 12px; }
+    
     .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    .btn {
-      padding: 14px 12px; border: none; border-radius: 12px;
-      font-size: 14px; font-weight: 600; cursor: pointer;
-      transition: opacity 0.15s, transform 0.1s;
-      display: flex; align-items: center; justify-content: center; gap: 8px;
-    }
-    .btn:active { transform: scale(0.97); opacity: 0.85; }
-    .btn-primary   { background: #4a9eff; color: #fff; }
-    .btn-secondary { background: #0d3060; color: #4a9eff; border: 1px solid #1e4a80; }
-    .btn-green  { background: #0d4030; color: #4eff91; border: 1px solid #1e6040; }
-    .btn-orange { background: #3d2000; color: #ffaa00; border: 1px solid #5a3000; }
-    .btn-full { grid-column: 1 / -1; }
-    .btn-icon { font-size: 18px; }
+    .btn { padding: 14px; border: none; border-radius: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; }
+    .btn-green { background: #0d4030; color: #4eff91; }
+    .btn-orange { background: #3d2000; color: #ffaa00; }
+    .btn-primary { background: #4a9eff; color: #fff; width: 100%; margin-top: 10px; }
 
-    /* Badges */
-    .badge-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
-    .badge {
-      font-size: 11px; padding: 4px 10px; border-radius: 20px;
-      font-weight: 600; display: flex; align-items: center; gap: 5px;
-    }
-    .badge-dot { width: 6px; height: 6px; border-radius: 50%; }
-    .badge-ok   { background: #0d3020; color: #4eff91; }
-    .badge-ok .badge-dot   { background: #4eff91; }
-    .badge-warn { background: #3d2000; color: #ffaa00; }
-    .badge-warn .badge-dot { background: #ffaa00; }
-    .badge-off  { background: #1a1a2e; color: #8899aa; }
-    .badge-off .badge-dot  { background: #8899aa; }
-
-    /* System Rows */
-    .power-row {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 10px 0; border-bottom: 1px solid #1a3050;
-    }
-    .power-row:last-child { border-bottom: none; }
-    .power-label { font-size: 13px; color: #8899aa; }
-    .power-value { font-size: 13px; font-weight: 600; color: #e0e8f0; }
-    .power-value.green { color: #4eff91; }
-    .power-value.orange { color: #ffaa00; }
-    .power-value.red { color: #ff6b35; }
-
-    /* Log */
-    #log { max-height: 180px; overflow-y: auto; font-size: 12px; color: #8899aa; line-height: 1.6; }
+    #log { max-height: 150px; overflow-y: auto; font-size: 12px; color: #8899aa; }
     .log-item { padding: 4px 0; border-bottom: 1px solid #0d1f35; }
-    .log-time { color: #4a9eff; margin-right: 6px; font-weight: 600; }
-    .log-item.alert { color: #ff6b35; }
-    .log-item.success { color: #4eff91; }
+    .log-time { color: #4a9eff; font-weight: 600; margin-right: 8px; }
   </style>
 </head>
 <body>
 
 <div class="header">
-  <div class="header-left">
-    <div class="logo">KIRA <span>Smart Feeder</span></div>
-  </div>
+  <div class="logo">KIRA <span>Smart Feeder</span></div>
   <div style="display:flex;align-items:center;gap:8px">
     <div class="conn-dot" id="conn-dot"></div>
-    <div class="conn-label" id="conn-label">Connecting...</div>
+    <div id="conn-label" class="conn-label">Connecting...</div>
   </div>
 </div>
 
 <div class="main">
-  <div id="conn-banner">
-    <span>⚠️</span>
-    <span id="conn-banner-text">Connecting to KIRA...</span>
-  </div>
+  <div id="conn-banner">⚠️ <span id="conn-banner-text">Connecting...</span></div>
 
   <div class="card">
     <div class="card-title">Bowl Status</div>
     <div class="bowl-row">
       <div class="bowl-card">
-        <div class="bowl-icon">🍖</div>
-        <div class="bowl-name">Food Bowl</div>
+        <div>🍖 Food</div>
         <div class="bowl-bar-bg"><div class="bowl-bar" id="food-bar"></div></div>
-        <div class="bowl-pct" id="food-pct">--</div>
-        <div class="bowl-status" id="food-status">Waiting...</div>
+        <div id="food-pct">--</div>
       </div>
       <div class="bowl-card">
-        <div class="bowl-icon">💧</div>
-        <div class="bowl-name">Water Bowl</div>
+        <div>💧 Water</div>
         <div class="bowl-bar-bg"><div class="bowl-bar" id="water-bar"></div></div>
-        <div class="bowl-pct" id="water-pct">--</div>
-        <div class="bowl-status" id="water-status">Waiting...</div>
+        <div id="water-pct">--</div>
       </div>
-    </div>
-    <div class="badge-row">
-      <div class="badge badge-off" id="servo-badge"><div class="badge-dot"></div> Servo: --</div>
-      <div class="badge badge-off" id="sol-badge"><div class="badge-dot"></div> Valve: --</div>
     </div>
   </div>
 
   <div class="card">
     <div class="card-title">Camera</div>
-    <div class="cam-wrap" id="cam-wrap">
-      <div class="cam-placeholder" id="cam-placeholder">
-        <div class="icon">📷</div>
-        <p>No snapshot yet</p>
-      </div>
-      <img id="snapshot" style="display:none" alt="KIRA snapshot">
-      <div class="cam-timestamp" id="cam-ts" style="display:none"></div>
+    <div class="cam-wrap">
+      <img id="snapshot" style="display:none">
+      <div id="placeholder">📷 No snapshot</div>
     </div>
-    <div class="btn-row">
-      <button class="btn btn-primary btn-full" onclick="takeSnapshot()">
-        <span class="btn-icon">📸</span> Take Snapshot
-      </button>
-    </div>
+    <button class="btn btn-primary" onclick="sendCmd('SNAPSHOT')">📸 Take Snapshot</button>
   </div>
 
   <div class="card">
     <div class="card-title">Controls</div>
     <div class="btn-row">
-      <button class="btn btn-green" onclick="sendCmd('FEED:NOW')">
-        <span class="btn-icon">🍖</span> Feed Now
-      </button>
-      <button class="btn btn-orange" onclick="sendCmd('WATER:NOW')">
-        <span class="btn-icon">💧</span> Water Now
-      </button>
-    </div>
-  </div>
-
-  <div class="card">
-    <div class="card-title">Power &amp; System</div>
-    <div class="power-row">
-      <div class="power-label">Power source</div>
-      <div class="power-value" id="power-src">--</div>
-    </div>
-    <div class="power-row">
-      <div class="power-label">Battery</div>
-      <div class="power-value" id="power-batt">--</div>
-    </div>
-    <div class="power-row">
-      <div class="power-label">WiFi</div>
-      <div class="power-value" id="wifi-status">--</div>
+      <button class="btn btn-green" onclick="sendCmd('FEED:NOW')">🍖 Feed</button>
+      <button class="btn btn-orange" onclick="sendCmd('WATER:NOW')">💧 Water</button>
     </div>
   </div>
 
   <div class="card">
     <div class="card-title">Activity Log</div>
-    <div id="log">
-      <div class="log-item"><span class="log-time">--:--</span>Connecting...</div>
-    </div>
+    <div id="log"></div>
   </div>
 </div>
 
 <script>
-// MQTT config
-const BROKER   = "0b5088bcba2d4f4383816bdfe8ca662a.s1.eu.hivemq.cloud";
-const PORT     = 8884; 
-const USER     = "NIVARANTECH";
-const PASS     = "Personal@1";
-const CLIENT   = "KIRA-WebUI-" + Math.random().toString(36).substr(2, 6);
-
-const T_CMD     = "kira/command";
-const T_STATUS  = "kira/status";
-const T_SNAP    = "kira/camera/snapshot";
-const T_SENSORS = "kira/sensors";
-const T_ALERT   = "kira/alert";
+const BROKER = "0b5088bcba2d4f4383816bdfe8ca662a.s1.eu.hivemq.cloud";
+const PORT = 8884;
+const USER = "NIVARANTECH";
+const PASS = "Personal@1";
+const CLIENT = "KIRA-Web-" + Math.random().toString(36).substr(2, 5);
 
 let client = null;
 let connected = false;
 
 function connect() {
-  // Check if library is ready
-  if (typeof Paho === 'undefined' || !Paho.MQTT) {
-    logItem("Waiting for MQTT library...", "alert");
+  // Fix: Check for both Paho.MQTT and Paho.Client (fixes your loop)
+  if (typeof Paho === 'undefined') {
+    logItem("Library not loaded yet...", "alert");
     setTimeout(connect, 1000);
     return;
   }
 
   try {
-    client = new Paho.MQTT.Client(BROKER, PORT, "/mqtt", CLIENT);
+    // Fix: Use Paho.Client directly as seen in your F12 console
+    const MQTTClient = Paho.Client; 
+    client = new MQTTClient(BROKER, PORT, "/mqtt", CLIENT);
 
     client.onConnectionLost = (r) => {
       connected = false;
-      setConnUI(false, "Disconnected — retrying...");
-      logItem("Connection lost: " + r.errorMessage, "alert");
-      setTimeout(connect, 4000);
+      setUI(false, "Disconnected");
+      setTimeout(connect, 5000);
     };
 
     client.onMessageArrived = (msg) => {
-      handleMessage(msg.destinationName, msg.payloadString);
+      if (msg.destinationName === "kira/sensors") updateUI(JSON.parse(msg.payloadString));
+      if (msg.destinationName === "kira/camera/snapshot") showSnap(msg.payloadString);
     };
 
     client.connect({
-      useSSL: true,
-      userName: USER,
-      password: PASS,
-      keepAliveInterval: 30,
+      useSSL: true, userName: USER, password: PASS,
       onSuccess: () => {
         connected = true;
-        setConnUI(true, "Connected");
-        logItem("Connected to KIRA", "success");
-        client.subscribe(T_STATUS);
-        client.subscribe(T_SNAP);
-        client.subscribe(T_SENSORS);
-        client.subscribe(T_ALERT);
-        publish(T_CMD, "STATUS");
+        setUI(true, "Connected");
+        client.subscribe("kira/sensors");
+        client.subscribe("kira/camera/snapshot");
+        logItem("Connected to HiveMQ", "success");
       },
       onFailure: (e) => {
-        connected = false;
-        setConnUI(false, "Connection failed");
-        logItem("Connect failed: " + e.errorMessage, "alert");
+        setUI(false, "Login Failed");
+        logItem("Error: " + e.errorMessage, "alert");
         setTimeout(connect, 5000);
       }
     });
-  } catch(e) {
-    console.error("MQTT Setup Error:", e);
-  }
-}
-
-function handleMessage(topic, payload) {
-  if (topic === T_SENSORS) {
-    try { updateSensors(JSON.parse(payload)); } catch(e) {}
-  } else if (topic === T_SNAP) {
-    showSnapshot(payload);
-  } else if (topic === T_ALERT) {
-    logItem("ALERT: " + payload, "alert");
-  } else if (topic === T_STATUS) {
-    logItem("Status: " + payload, "success");
-  }
-}
-
-function updateSensors(d) {
-  if (d.food !== undefined) {
-    const el = document.getElementById("food-bar");
-    el.style.width = d.food + "%";
-    el.className = "bowl-bar " + (d.food <= 20 ? "low" : d.food <= 50 ? "mid" : "high");
-    document.getElementById("food-pct").textContent = d.food + "%";
-  }
-  if (d.water !== undefined) {
-    const el = document.getElementById("water-bar");
-    el.style.width = d.water + "%";
-    el.className = "bowl-bar " + (d.water <= 20 ? "low" : d.water <= 50 ? "mid" : "high");
-    document.getElementById("water-pct").textContent = d.water + "%";
-  }
-  if (d.battery !== undefined) {
-    const b = document.getElementById("power-batt");
-    b.textContent = d.battery + "%";
-    b.className = "power-value " + (d.battery <= 25 ? "red" : "green");
-  }
-}
-
-function showSnapshot(b64) {
-  const img = document.getElementById("snapshot");
-  img.src = "data:image/jpeg;base64," + b64;
-  img.style.display = "block";
-  document.getElementById("cam-placeholder").style.display = "none";
-  document.getElementById("cam-ts").style.display = "block";
-  document.getElementById("cam-ts").textContent = new Date().toLocaleTimeString();
+  } catch(e) { console.error(e); }
 }
 
 function sendCmd(cmd) {
-  if (!connected) return logItem("Not connected", "alert");
-  publish(T_CMD, cmd);
+  if (!connected) return;
+  const msg = new Paho.Message(cmd);
+  msg.destinationName = "kira/command";
+  client.send(msg);
   logItem("Sent: " + cmd);
 }
 
-function takeSnapshot() { sendCmd("SNAPSHOT"); }
-
-function publish(topic, payload) {
-  if (!client || !connected) return;
-  const msg = new Paho.MQTT.Message(payload);
-  msg.destinationName = topic;
-  client.send(msg);
+function updateUI(d) {
+  if (d.food !== undefined) {
+    document.getElementById("food-bar").style.width = d.food + "%";
+    document.getElementById("food-pct").innerText = d.food + "%";
+  }
 }
 
-function setConnUI(ok, label) {
+function showSnap(b64) {
+  document.getElementById("snapshot").src = "data:image/jpeg;base64," + b64;
+  document.getElementById("snapshot").style.display = "block";
+  document.getElementById("placeholder").style.display = "none";
+}
+
+function setUI(ok, txt) {
   document.getElementById("conn-dot").className = "conn-dot" + (ok ? " on" : "");
-  document.getElementById("conn-label").textContent = label;
-  const banner = document.getElementById("conn-banner");
-  if (!ok) banner.classList.add("show");
-  else banner.classList.remove("show");
+  document.getElementById("conn-label").innerText = txt;
+  document.getElementById("conn-banner").className = ok ? "" : "show";
 }
 
-function logItem(msg, type) {
+function logItem(m, type) {
   const log = document.getElementById("log");
   const div = document.createElement("div");
-  div.className = "log-item" + (type ? " " + type : "");
-  div.innerHTML = `<span class="log-time">${new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</span> ${msg}`;
+  div.className = "log-item " + (type || "");
+  div.innerHTML = `<span class="log-time">${new Date().toLocaleTimeString()}</span> ${m}`;
   log.insertBefore(div, log.firstChild);
 }
 
-window.addEventListener("load", () => {
-  setTimeout(connect, 500);
-});
+window.onload = () => setTimeout(connect, 500);
 </script>
 </body>
 </html>
