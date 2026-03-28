@@ -8,7 +8,7 @@
   <meta name="theme-color" content="#0a1628">
   <title>KIRA Pet Feeder</title>
 
-  <script src="paho-mqtt.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.1.0/paho-mqtt.min.js"></script>
 
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -129,7 +129,7 @@ function connect() {
 
   try {
     // Fix: Use Paho.Client directly as seen in your F12 console
-    const MQTTClient = Paho.Client; 
+    const MQTTClient = (typeof Paho.MQTT !== 'undefined') ? Paho.MQTT.Client : Paho.Client;
     client = new MQTTClient(BROKER, PORT, "/mqtt", CLIENT);
 
     client.onConnectionLost = (r) => {
