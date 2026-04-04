@@ -7,9 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0a1628">
 <title>KIRA Pet Feeder</title>
-
 <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.1.0/paho-mqtt.min.js"></script>
-
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -18,10 +16,9 @@
     background: #0a1628;
     color: #e0e8f0;
     min-height: 100vh;
-    padding-bottom: 24px;
+    padding-bottom: 32px;
   }
 
-  /* Header */
   .header {
     background: #0d1f35;
     border-bottom: 1px solid #1e3a5f;
@@ -35,17 +32,12 @@
   }
   .logo { font-size: 22px; font-weight: 700; color: #4a9eff; letter-spacing: 1px; }
   .logo span { color: #e0e8f0; font-weight: 300; font-size: 14px; margin-left: 4px; }
-  .conn-dot {
-    width: 9px; height: 9px; border-radius: 50%;
-    background: #ff4444;
-    transition: background 0.3s;
-  }
+  .conn-dot { width: 9px; height: 9px; border-radius: 50%; background: #ff4444; transition: background 0.3s; }
   .conn-dot.on { background: #4eff91; box-shadow: 0 0 8px #4eff91; }
   .conn-label { font-size: 12px; color: #8899aa; }
 
   .main { padding: 16px; max-width: 480px; margin: 0 auto; }
 
-  /* Card UI */
   .card {
     background: #0d1f35;
     border: 1px solid #1e3a5f;
@@ -62,7 +54,7 @@
     margin-bottom: 14px;
   }
 
-  /* Bowl Indicators */
+  /* ── Bowl Weight Cards ── */
   .bowl-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   .bowl-card {
     background: #091525;
@@ -70,29 +62,93 @@
     border-radius: 12px;
     padding: 16px;
     text-align: center;
+    position: relative;
   }
-  .bowl-icon { font-size: 28px; margin-bottom: 8px; }
+  .bowl-icon { font-size: 28px; margin-bottom: 6px; }
   .bowl-name { font-size: 12px; color: #8899aa; margin-bottom: 10px; }
+
+  /* Weight display — main number */
+  .bowl-weight {
+    font-size: 30px;
+    font-weight: 700;
+    color: #e0e8f0;
+    line-height: 1;
+    transition: color 0.4s;
+  }
+  .bowl-weight.low  { color: #ff6b35; }
+  .bowl-weight.ok   { color: #4eff91; }
+  .bowl-unit { font-size: 13px; color: #8899aa; font-weight: 400; margin-left: 2px; }
+
+  /* Mini bar under weight — visual fill indicator */
   .bowl-bar-bg {
     background: #0a1628;
     border-radius: 6px;
-    height: 8px;
+    height: 5px;
     overflow: hidden;
-    margin-bottom: 8px;
+    margin: 10px 0 6px;
   }
   .bowl-bar {
     height: 100%;
     border-radius: 6px;
     background: #4a9eff;
-    transition: width 0.6s ease;
+    transition: width 0.6s ease, background 0.4s;
     width: 0%;
   }
   .bowl-bar.low  { background: #ff6b35; }
-  .bowl-bar.high { background: #4eff91; }
-  .bowl-pct { font-size: 18px; font-weight: 700; color: #e0e8f0; }
-  .bowl-status { font-size: 11px; margin-top: 4px; color: #8899aa; }
+  .bowl-bar.ok   { background: #4eff91; }
+  .bowl-status { font-size: 11px; color: #8899aa; }
 
-  /* Camera UI */
+  /* Max capacity labels */
+  .bowl-capacity { font-size: 10px; color: #4a6080; margin-top: 4px; }
+
+  /* ── Consumption History ── */
+  .consumption-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+  .cons-card {
+    background: #091525;
+    border: 1px solid #1a3050;
+    border-radius: 12px;
+    padding: 14px;
+    text-align: center;
+  }
+  .cons-icon { font-size: 20px; margin-bottom: 4px; }
+  .cons-label { font-size: 10px; color: #8899aa; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .cons-value { font-size: 22px; font-weight: 700; color: #4a9eff; }
+  .cons-unit  { font-size: 11px; color: #8899aa; }
+  .cons-sub   { font-size: 10px; color: #4a6080; margin-top: 4px; }
+
+  /* Timeline mini-chart */
+  .timeline-wrap { margin-top: 14px; }
+  .timeline-label { font-size: 10px; color: #4a6080; display: flex; justify-content: space-between; margin-bottom: 6px; }
+  .timeline-bars  { display: flex; align-items: flex-end; gap: 3px; height: 60px; }
+  .tbar {
+    flex: 1;
+    border-radius: 3px 3px 0 0;
+    min-height: 3px;
+    transition: height 0.4s ease;
+    cursor: pointer;
+    position: relative;
+  }
+  .tbar.food-bar-t  { background: #2a7fd4; }
+  .tbar.water-bar-t { background: #1a6050; }
+  .tbar:hover::after {
+    content: attr(data-tip);
+    position: absolute;
+    bottom: 110%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1e3a5f;
+    color: #e0e8f0;
+    padding: 3px 7px;
+    border-radius: 6px;
+    font-size: 10px;
+    white-space: nowrap;
+    z-index: 10;
+    pointer-events: none;
+  }
+  .timeline-legend { display: flex; gap: 14px; margin-top: 8px; }
+  .legend-dot { width: 8px; height: 8px; border-radius: 2px; display: inline-block; margin-right: 4px; }
+
+  /* ── Camera ── */
   .cam-wrap {
     background: #040d1a;
     border-radius: 12px;
@@ -113,7 +169,7 @@
     background: rgba(0,0,0,0.5); padding: 3px 8px; border-radius: 6px;
   }
 
-  /* Buttons */
+  /* ── Buttons ── */
   .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .btn {
     padding: 14px 12px; border: none; border-radius: 12px;
@@ -122,12 +178,13 @@
   }
   .btn:active { transform: scale(0.97); }
   .btn-primary   { background: #4a9eff; color: #fff; grid-column: 1 / -1; }
-  .btn-green  { background: #0d4030; color: #4eff91; border: 1px solid #1e6040; }
-  .btn-orange { background: #3d2000; color: #ffaa00; border: 1px solid #5a3000; }
-.btn-secondary { background: #0d1f35; color: #8899aa; border: 1px solid #1e3a5f; }
-.btn-warn { background: #3d0d0d; color: #ff6b35; border: 1px solid #6a1a1a; }
+  .btn-green     { background: #0d4030; color: #4eff91; border: 1px solid #1e6040; }
+  .btn-orange    { background: #3d2000; color: #ffaa00; border: 1px solid #5a3000; }
+  .btn-secondary { background: #0d1f35; color: #8899aa; border: 1px solid #1e3a5f; }
+  .btn-warn      { background: #3d0d0d; color: #ff6b35; border: 1px solid #6a1a1a; }
+  .btn-tare      { background: #1a1a3a; color: #8888ff; border: 1px solid #2a2a5a; grid-column: 1 / -1; }
 
-  /* Badges & Power Info */
+  /* ── Badges ── */
   .badge-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
   .badge { font-size: 11px; padding: 4px 10px; border-radius: 20px; font-weight: 600; display: flex; align-items: center; gap: 5px; }
   .badge-dot { width: 6px; height: 6px; border-radius: 50%; }
@@ -138,20 +195,21 @@
   .badge-off  { background: #1a1a2e; color: #8899aa; }
   .badge-off .badge-dot  { background: #8899aa; }
 
+  /* ── Power ── */
   .power-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #1a3050; }
   .power-row:last-child { border-bottom: none; }
   .power-label { font-size: 13px; color: #8899aa; }
   .power-value { font-size: 13px; font-weight: 600; color: #e0e8f0; }
-  .power-value.green { color: #4eff91; }
+  .power-value.green  { color: #4eff91; }
   .power-value.orange { color: #ffaa00; }
-  .power-value.red { color: #ff6b35; }
+  .power-value.red    { color: #ff6b35; }
 
-  /* Log */
+  /* ── Log ── */
   #log { max-height: 180px; overflow-y: auto; font-size: 12px; color: #8899aa; }
   .log-item { padding: 4px 0; border-bottom: 1px solid #0d1f35; }
   .log-time { color: #4a9eff; margin-right: 6px; font-weight: 600; }
   .success { color: #4eff91; }
-  .alert { color: #ff6b35; }
+  .alert   { color: #ff6b35; }
 
   #conn-banner {
     background: #2a0d0d; border: 1px solid #5a1a1a; border-radius: 10px; padding: 12px 16px;
@@ -173,23 +231,29 @@
 <div class="main">
   <div id="conn-banner">⚠️ <span id="conn-banner-text">Not connected to KIRA</span></div>
 
+  <!-- ── Bowl Weight Card ── -->
   <div class="card">
-    <div class="card-title">Bowl Status</div>
+    <div class="card-title">Bowl Weight</div>
     <div class="bowl-row">
+
       <div class="bowl-card">
         <div class="bowl-icon">🍖</div>
         <div class="bowl-name">Food Bowl</div>
-        <div class="bowl-bar-bg"><div class="bowl-bar" id="food-bar"></div></div>
-        <div class="bowl-pct" id="food-pct">--</div>
+        <div class="bowl-weight ok" id="food-weight">--<span class="bowl-unit">g</span></div>
+        <div class="bowl-bar-bg"><div class="bowl-bar ok" id="food-bar"></div></div>
         <div class="bowl-status" id="food-status">Waiting...</div>
+        <div class="bowl-capacity" id="food-cap"></div>
       </div>
+
       <div class="bowl-card">
         <div class="bowl-icon">💧</div>
         <div class="bowl-name">Water Bowl</div>
-        <div class="bowl-bar-bg"><div class="bowl-bar" id="water-bar"></div></div>
-        <div class="bowl-pct" id="water-pct">--</div>
+        <div class="bowl-weight ok" id="water-weight">--<span class="bowl-unit">g</span></div>
+        <div class="bowl-bar-bg"><div class="bowl-bar ok" id="water-bar"></div></div>
         <div class="bowl-status" id="water-status">Waiting...</div>
+        <div class="bowl-capacity" id="water-cap"></div>
       </div>
+
     </div>
     <div class="badge-row">
       <div class="badge badge-off" id="servo-badge"><div class="badge-dot"></div> Servo: --</div>
@@ -197,6 +261,48 @@
     </div>
   </div>
 
+  <!-- ── 30-Min Consumption History ── -->
+  <div class="card">
+    <div class="card-title">Consumed — Last 30 Minutes</div>
+
+    <div class="consumption-grid">
+      <div class="cons-card">
+        <div class="cons-icon">🍖</div>
+        <div class="cons-label">Food Eaten</div>
+        <div class="cons-value" id="food-consumed">0</div>
+        <div class="cons-unit">grams</div>
+        <div class="cons-sub" id="food-peak">Peak: --</div>
+      </div>
+      <div class="cons-card">
+        <div class="cons-icon">💧</div>
+        <div class="cons-label">Water Drunk</div>
+        <div class="cons-value" id="water-consumed">0</div>
+        <div class="cons-unit">grams</div>
+        <div class="cons-sub" id="water-peak">Peak: --</div>
+      </div>
+    </div>
+
+    <!-- Timeline bar chart — 30 buckets of 1 min each -->
+    <div class="timeline-wrap">
+      <div class="timeline-label">
+        <span>30 min ago</span>
+        <span>15 min ago</span>
+        <span>Now</span>
+      </div>
+      <div class="timeline-bars" id="timeline-bars"></div>
+      <div class="timeline-legend" style="margin-top:10px">
+        <div style="font-size:11px;color:#8899aa;display:flex;align-items:center">
+          <span class="legend-dot" style="background:#2a7fd4"></span>Food
+        </div>
+        <div style="font-size:11px;color:#8899aa;display:flex;align-items:center">
+          <span class="legend-dot" style="background:#1a6050"></span>Water
+        </div>
+        <div style="font-size:11px;color:#4a6080;margin-left:auto" id="history-updated">No data yet</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Camera ── -->
   <div class="card">
     <div class="card-title">Camera</div>
     <div class="cam-wrap">
@@ -210,18 +316,23 @@
     <button class="btn btn-primary" onclick="sendCmd('SNAPSHOT')">📸 Take Snapshot</button>
   </div>
 
- <div class="card">
+  <!-- ── Controls ── -->
+  <div class="card">
     <div class="card-title">Controls</div>
     <div class="btn-row">
-      <button class="btn btn-green" onclick="sendCmd('FEED:NOW')">🍖 Feed Now</button>
+      <button class="btn btn-green"  onclick="sendCmd('FEED:NOW')">🍖 Feed Now</button>
       <button class="btn btn-orange" onclick="sendCmd('WATER:NOW')">💧 Water Now</button>
     </div>
     <div class="btn-row" style="margin-top:10px">
       <button id="servo-btn" class="btn btn-secondary" onclick="toggleServo()">🔧 Open Flap</button>
       <button id="valve-btn" class="btn btn-secondary" onclick="toggleValve()">🔧 Open Valve</button>
     </div>
+    <div class="btn-row" style="margin-top:10px">
+      <button class="btn btn-tare" onclick="tareScales()">⚖️ Tare Scales (empty bowls first)</button>
+    </div>
   </div>
 
+  <!-- ── Power & System ── -->
   <div class="card">
     <div class="card-title">Power & System</div>
     <div class="power-row">
@@ -238,6 +349,7 @@
     </div>
   </div>
 
+  <!-- ── Activity Log ── -->
   <div class="card">
     <div class="card-title">Activity Log</div>
     <div id="log"></div>
@@ -245,26 +357,156 @@
 </div>
 
 <script>
+// ── MQTT config ───────────────────────────────────────────────────────────────
 const BROKER = "0b5088bcba2d4f4383816bdfe8ca662a.s1.eu.hivemq.cloud";
-const PORT = 8884;
-const USER = "NIVARANTECH";
-const PASS = "Personal@1";
+const PORT   = 8884;
+const USER   = "NIVARANTECH";
+const PASS   = "Personal@1";
 const CLIENT = "KIRA_WEB_" + Math.random().toString(16).substr(2, 4);
 
-let client = null;
+let client    = null;
 let connected = false;
 
+// ── Bowl capacity config (grams) — adjust to your bowls ──────────────────────
+const FOOD_MAX_G  = 400;  // max grams your food bowl holds
+const WATER_MAX_G = 500;  // max grams your water bowl holds
+const FOOD_LOW_G  = 80;   // matches Nano threshold
+const WATER_LOW_G = 100;
+
+// ── Consumption history — 30 x 1-min buckets ─────────────────────────────────
+const BUCKET_COUNT = 30;
+const BUCKET_MS    = 60000; // 1 minute per bucket
+
+// Each bucket stores: { foodStart, waterStart, foodConsumed, waterConsumed }
+let history = Array.from({length: BUCKET_COUNT}, () =>
+  ({ foodStart: null, waterStart: null, foodConsumed: 0, waterConsumed: 0 })
+);
+
+let currentBucket   = 0;
+let lastBucketTime  = Date.now();
+let lastFoodGrams   = null;
+let lastWaterGrams  = null;
+
+// ── Build timeline bar DOM ────────────────────────────────────────────────────
+function buildTimeline() {
+  const wrap = document.getElementById('timeline-bars');
+  wrap.innerHTML = '';
+  for (let i = 0; i < BUCKET_COUNT; i++) {
+    const pair = document.createElement('div');
+    pair.style.cssText = 'flex:1;display:flex;flex-direction:column;gap:2px;align-items:center;height:100%';
+
+    const fb = document.createElement('div');
+    fb.className = 'tbar food-bar-t';
+    fb.id = `fb-${i}`;
+    fb.style.width = '100%';
+    fb.style.height = '3px';
+
+    const wb = document.createElement('div');
+    wb.className = 'tbar water-bar-t';
+    wb.id = `wb-${i}`;
+    wb.style.width = '100%';
+    wb.style.height = '3px';
+
+    pair.appendChild(fb);
+    pair.appendChild(wb);
+    wrap.appendChild(pair);
+  }
+}
+
+// ── Update history when new sensor data arrives ───────────────────────────────
+function updateHistory(foodG, waterG) {
+  const now = Date.now();
+
+  // Advance bucket if 1 min has passed
+  if (now - lastBucketTime >= BUCKET_MS) {
+    currentBucket = (currentBucket + 1) % BUCKET_COUNT;
+    history[currentBucket] = { foodStart: null, waterStart: null, foodConsumed: 0, waterConsumed: 0 };
+    lastBucketTime = now;
+  }
+
+  const bucket = history[currentBucket];
+
+  // Set start reference for this bucket
+  if (bucket.foodStart  === null && foodG  !== null) bucket.foodStart  = foodG;
+  if (bucket.waterStart === null && waterG !== null) bucket.waterStart = waterG;
+
+  // Consumed = start - current (weight dropped = consumed)
+  if (bucket.foodStart  !== null && foodG  !== null) {
+    const diff = bucket.foodStart - foodG;
+    bucket.foodConsumed  = Math.max(0, diff);
+  }
+  if (bucket.waterStart !== null && waterG !== null) {
+    const diff = bucket.waterStart - waterG;
+    bucket.waterConsumed = Math.max(0, diff);
+  }
+
+  lastFoodGrams  = foodG;
+  lastWaterGrams = waterG;
+
+  renderHistory();
+}
+
+function renderHistory() {
+  // Find max for scaling
+  let maxF = 1, maxW = 1;
+  history.forEach(b => {
+    if (b.foodConsumed  > maxF) maxF = b.foodConsumed;
+    if (b.waterConsumed > maxW) maxW = b.waterConsumed;
+  });
+
+  // Total consumed in last 30 min
+  let totalFood = 0, totalWater = 0;
+  let peakFood = 0, peakWater = 0;
+  history.forEach(b => {
+    totalFood  += b.foodConsumed;
+    totalWater += b.waterConsumed;
+    if (b.foodConsumed  > peakFood)  peakFood  = b.foodConsumed;
+    if (b.waterConsumed > peakWater) peakWater = b.waterConsumed;
+  });
+
+  // Update summary cards
+  document.getElementById('food-consumed').innerText  = Math.round(totalFood);
+  document.getElementById('water-consumed').innerText = Math.round(totalWater);
+  document.getElementById('food-peak').innerText  = peakFood  > 0 ? `Peak: ${Math.round(peakFood)}g/min`  : 'Peak: --';
+  document.getElementById('water-peak').innerText = peakWater > 0 ? `Peak: ${Math.round(peakWater)}g/min` : 'Peak: --';
+
+  // Update bar chart — chronological order from oldest to newest
+  for (let i = 0; i < BUCKET_COUNT; i++) {
+    // Map bar index to history index (oldest first)
+    const idx = (currentBucket + 1 + i) % BUCKET_COUNT;
+    const b   = history[idx];
+
+    const fh = maxF > 0 ? (b.foodConsumed  / maxF) * 55 : 0;
+    const wh = maxW > 0 ? (b.waterConsumed / maxW) * 55 : 0;
+
+    const fb = document.getElementById(`fb-${i}`);
+    const wb = document.getElementById(`wb-${i}`);
+
+    if (fb) {
+      fb.style.height = Math.max(3, fh) + 'px';
+      const minsAgo = BUCKET_COUNT - i;
+      fb.setAttribute('data-tip', `${minsAgo}min ago: ${Math.round(b.foodConsumed)}g food`);
+    }
+    if (wb) {
+      wb.style.height = Math.max(3, wh) + 'px';
+      const minsAgo = BUCKET_COUNT - i;
+      wb.setAttribute('data-tip', `${minsAgo}min ago: ${Math.round(b.waterConsumed)}g water`);
+    }
+  }
+
+  document.getElementById('history-updated').innerText =
+    'Updated ' + new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+}
+
+// ── MQTT connect ──────────────────────────────────────────────────────────────
 function connect() {
   if (typeof Paho === 'undefined') {
     logItem("Waiting for MQTT library...", "alert");
     setTimeout(connect, 1000);
     return;
   }
-
   try {
-    // Correct constructor for the library confirmed in your console
-    const MQTTClient = Paho.Client; 
-    client = new MQTTClient(BROKER, PORT, "/mqtt", CLIENT);
+    client = new Paho.Client(BROKER, PORT, "/mqtt", CLIENT);
 
     client.onConnectionLost = (r) => {
       connected = false;
@@ -286,6 +528,7 @@ function connect() {
         client.subscribe("kira/sensors");
         client.subscribe("kira/camera/snapshot");
         client.subscribe("kira/status");
+        client.subscribe("kira/alert");
       },
       onFailure: (e) => {
         setConnUI(false, "Login Failed");
@@ -296,13 +539,14 @@ function connect() {
   } catch(e) { console.error(e); }
 }
 
+// ── Message handler ───────────────────────────────────────────────────────────
 function handleMessage(topic, payload) {
   if (topic === "kira/sensors") {
     try {
       const d = JSON.parse(payload);
       updateSensors(d);
-    } catch(e) { console.error("JSON Parse Error"); }
-  } 
+    } catch(e) { console.error("JSON Parse Error", e); }
+  }
   else if (topic === "kira/camera/snapshot") {
     const img = document.getElementById("snapshot");
     img.src = "data:image/jpeg;base64," + payload;
@@ -312,50 +556,90 @@ function handleMessage(topic, payload) {
     document.getElementById("cam-ts").innerText = new Date().toLocaleTimeString();
     logItem("Snapshot received", "success");
   }
+  else if (topic === "kira/alert") {
+    try {
+      const d = JSON.parse(payload);
+      const a = d.alert || payload;
+      logItem("⚠️ ALERT: " + a, "alert");
+    } catch { logItem("⚠️ " + payload, "alert"); }
+  }
 }
 
+// ── Sensor update ─────────────────────────────────────────────────────────────
 function updateSensors(d) {
-  if (d.food !== undefined) {
-    const bar = document.getElementById("food-bar");
-    bar.style.width = d.food + "%";
-    bar.className = "bowl-bar " + (d.food <= 20 ? "low" : "high");
-    document.getElementById("food-pct").innerText = d.food + "%";
-    document.getElementById("food-status").innerText = d.food <= 20 ? "⚠ Refill needed" : "Good";
+  // Food weight (grams)
+  if (d.food_g !== undefined) {
+    const g   = parseFloat(d.food_g);
+    const pct = Math.min(100, Math.max(0, (g / FOOD_MAX_G) * 100));
+    const low = g <= FOOD_LOW_G;
+
+    const wEl  = document.getElementById('food-weight');
+    const bar  = document.getElementById('food-bar');
+    const stat = document.getElementById('food-status');
+    const cap  = document.getElementById('food-cap');
+
+    wEl.innerHTML  = Math.round(g) + '<span class="bowl-unit">g</span>';
+    wEl.className  = 'bowl-weight ' + (low ? 'low' : 'ok');
+    bar.style.width = pct + '%';
+    bar.className   = 'bowl-bar ' + (low ? 'low' : 'ok');
+    stat.innerText  = low ? '⚠ Refill needed' : 'Good';
+    cap.innerText   = `Max ~${FOOD_MAX_G}g`;
+
+    updateHistory(g, lastWaterGrams);
   }
-  if (d.water !== undefined) {
-    const bar = document.getElementById("water-bar");
-    bar.style.width = d.water + "%";
-    bar.className = "bowl-bar " + (d.water <= 20 ? "low" : "high");
-    document.getElementById("water-pct").innerText = d.water + "%";
-    document.getElementById("water-status").innerText = d.water <= 20 ? "⚠ Refill needed" : "Good";
+
+  // Water weight (grams)
+  if (d.water_g !== undefined) {
+    const g   = parseFloat(d.water_g);
+    const pct = Math.min(100, Math.max(0, (g / WATER_MAX_G) * 100));
+    const low = g <= WATER_LOW_G;
+
+    const wEl  = document.getElementById('water-weight');
+    const bar  = document.getElementById('water-bar');
+    const stat = document.getElementById('water-status');
+    const cap  = document.getElementById('water-cap');
+
+    wEl.innerHTML  = Math.round(g) + '<span class="bowl-unit">g</span>';
+    wEl.className  = 'bowl-weight ' + (low ? 'low' : 'ok');
+    bar.style.width = pct + '%';
+    bar.className   = 'bowl-bar ' + (low ? 'low' : 'ok');
+    stat.innerText  = low ? '⚠ Refill needed' : 'Good';
+    cap.innerText   = `Max ~${WATER_MAX_G}g`;
+
+    updateHistory(lastFoodGrams, g);
   }
+
+  // Battery / power
   if (d.battery !== undefined) {
-    const b = document.getElementById("power-batt");
+    const b = document.getElementById('power-batt');
     b.innerText = d.battery + "%";
-    b.className = "power-value " + (d.battery <= 25 ? "red" : "green");
+    b.className = 'power-value ' + (d.battery <= 25 ? 'red' : 'green');
   }
   if (d.wall !== undefined) {
-    const p = document.getElementById("power-src");
+    const p = document.getElementById('power-src');
     p.innerText = d.wall ? "Wall socket" : "Battery";
-    p.className = "power-value " + (d.wall ? "green" : "orange");
+    p.className = 'power-value ' + (d.wall ? 'green' : 'orange');
   }
   if (d.wifi !== undefined) {
-    const w = document.getElementById("wifi-status");
+    const w = document.getElementById('wifi-status');
     w.innerText = d.wifi ? "Connected" : "Offline";
-    w.className = "power-value " + (d.wifi ? "green" : "red");
+    w.className = 'power-value ' + (d.wifi ? 'green' : 'red');
   }
+
+  // Badges
   if (d.servo !== undefined) {
-    const s = document.getElementById("servo-badge");
+    const s = document.getElementById('servo-badge');
     s.innerHTML = `<div class="badge-dot"></div> Servo: ${d.servo}`;
-    s.className = "badge " + (d.servo === "open" ? "badge-warn" : "badge-ok");
+    s.className = 'badge ' + (d.servo === 'open' ? 'badge-warn' : 'badge-ok');
   }
   if (d.solenoid !== undefined) {
-    const s = document.getElementById("sol-badge");
+    const s = document.getElementById('sol-badge');
     s.innerHTML = `<div class="badge-dot"></div> Valve: ${d.solenoid}`;
-    s.className = "badge " + (d.solenoid === "open" ? "badge-warn" : "badge-ok");
+    s.className = 'badge ' + (d.solenoid === 'open' ? 'badge-warn' : 'badge-ok');
   }
 }
 
+// ── Commands ──────────────────────────────────────────────────────────────────
 function sendCmd(cmd) {
   if (!connected) return logItem("Not connected", "alert");
   const msg = new Paho.Message(cmd);
@@ -364,19 +648,21 @@ function sendCmd(cmd) {
   logItem("Sent: " + cmd);
 }
 
-function setConnUI(ok, txt) {
-  document.getElementById("conn-dot").className = "conn-dot" + (ok ? " on" : "");
-  document.getElementById("conn-label").innerText = txt;
-  document.getElementById("conn-banner").className = ok ? "" : "show";
+function tareScales() {
+  if (!connected) return logItem("Not connected", "alert");
+  if (!confirm("Ensure both bowls are EMPTY before taring. Proceed?")) return;
+  sendCmd('TARE:ALL');
+  // Reset history baselines
+  history = Array.from({length: BUCKET_COUNT}, () =>
+    ({ foodStart: null, waterStart: null, foodConsumed: 0, waterConsumed: 0 })
+  );
+  lastFoodGrams  = null;
+  lastWaterGrams = null;
+  renderHistory();
+  logItem("Tare command sent — baselines reset", "success");
 }
 
-function logItem(m, type) {
-  const log = document.getElementById("log");
-  const div = document.createElement("div");
-  div.className = "log-item " + (type || "");
-  div.innerHTML = `<span class="log-time">${new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span> ${m}`;
-  log.insertBefore(div, log.firstChild);
-}
+// ── Toggle helpers ────────────────────────────────────────────────────────────
 let servoIsOpen = false;
 function toggleServo() {
   if (!servoIsOpen) {
@@ -406,7 +692,29 @@ function toggleValve() {
     document.getElementById('valve-btn').innerHTML = '🔧 Open Valve';
   }
 }
-window.onload = () => setTimeout(connect, 500);
+
+// ── UI helpers ────────────────────────────────────────────────────────────────
+function setConnUI(ok, txt) {
+  document.getElementById("conn-dot").className = "conn-dot" + (ok ? " on" : "");
+  document.getElementById("conn-label").innerText = txt;
+  document.getElementById("conn-banner").className = ok ? "" : "show";
+}
+
+function logItem(m, type) {
+  const log = document.getElementById("log");
+  const div = document.createElement("div");
+  div.className = "log-item " + (type || "");
+  div.innerHTML = `<span class="log-time">${new Date().toLocaleTimeString([],
+    {hour:'2-digit', minute:'2-digit'})}</span> ${m}`;
+  log.insertBefore(div, log.firstChild);
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+window.onload = () => {
+  buildTimeline();
+  renderHistory();
+  setTimeout(connect, 500);
+};
 </script>
 </body>
 </html>
