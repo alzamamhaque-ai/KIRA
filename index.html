@@ -8,6 +8,11 @@
 <meta name="theme-color" content="#0a1628">
 <title>KIRA Pet Feeder</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.1.0/paho-mqtt.min.js"></script>
+
+<!-- AI Detection — TensorFlow.js + COCO-SSD (loaded async, non-blocking) -->
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.11.0/dist/tf.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js" defer></script>
+
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -66,8 +71,6 @@
   }
   .bowl-icon { font-size: 28px; margin-bottom: 6px; }
   .bowl-name { font-size: 12px; color: #8899aa; margin-bottom: 10px; }
-
-  /* Weight display — main number */
   .bowl-weight {
     font-size: 30px;
     font-weight: 700;
@@ -78,8 +81,6 @@
   .bowl-weight.low  { color: #ff6b35; }
   .bowl-weight.ok   { color: #4eff91; }
   .bowl-unit { font-size: 13px; color: #8899aa; font-weight: 400; margin-left: 2px; }
-
-  /* Mini bar under weight — visual fill indicator */
   .bowl-bar-bg {
     background: #0a1628;
     border-radius: 6px;
@@ -97,8 +98,6 @@
   .bowl-bar.low  { background: #ff6b35; }
   .bowl-bar.ok   { background: #4eff91; }
   .bowl-status { font-size: 11px; color: #8899aa; }
-
-  /* Max capacity labels */
   .bowl-capacity { font-size: 10px; color: #4a6080; margin-top: 4px; }
 
   /* ── Consumption History ── */
@@ -115,8 +114,6 @@
   .cons-value { font-size: 22px; font-weight: 700; color: #4a9eff; }
   .cons-unit  { font-size: 11px; color: #8899aa; }
   .cons-sub   { font-size: 10px; color: #4a6080; margin-top: 4px; }
-
-  /* Timeline mini-chart */
   .timeline-wrap { margin-top: 14px; }
   .timeline-label { font-size: 10px; color: #4a6080; display: flex; justify-content: space-between; margin-bottom: 6px; }
   .timeline-bars  { display: flex; align-items: flex-end; gap: 3px; height: 60px; }
@@ -148,7 +145,7 @@
   .timeline-legend { display: flex; gap: 14px; margin-top: 8px; }
   .legend-dot { width: 8px; height: 8px; border-radius: 2px; display: inline-block; margin-right: 4px; }
 
-  /* ── Camera ── */
+  /* ── Camera — UPDATED for canvas overlay ── */
   .cam-wrap {
     background: #040d1a;
     border-radius: 12px;
@@ -160,7 +157,13 @@
     justify-content: center;
     margin-bottom: 12px;
   }
-  #snapshot { width: 100%; display: block; border-radius: 12px; }
+  /* Image hidden — canvas shows the image + boxes */
+  #snapshot { display: none; }
+  #det-canvas {
+    width: 100%;
+    display: block;
+    border-radius: 12px;
+  }
   .cam-placeholder { text-align: center; color: #2a4a6a; padding: 40px 20px; }
   .cam-placeholder .icon { font-size: 40px; margin-bottom: 8px; }
   .cam-timestamp {
@@ -168,6 +171,22 @@
     font-size: 11px; color: rgba(255,255,255,0.6);
     background: rgba(0,0,0,0.5); padding: 3px 8px; border-radius: 6px;
   }
+
+  /* ── AI detection status badge ── */
+  .ai-badge {
+    position: absolute;
+    top: 8px;
+    left: 10px;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 6px;
+    display: none;
+  }
+  .ai-badge.loading { background: rgba(74,158,255,0.2); color: #4a9eff; display: block; }
+  .ai-badge.detected { background: rgba(78,255,145,0.2); color: #4eff91; display: block; }
+  .ai-badge.none { background: rgba(136,153,170,0.2); color: #8899aa; display: block; }
+  .ai-badge.error { background: rgba(255,107,53,0.15); color: #ff6b35; display: block; }
 
   /* ── Buttons ── */
   .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -235,7 +254,6 @@
   <div class="card">
     <div class="card-title">Bowl Weight</div>
     <div class="bowl-row">
-
       <div class="bowl-card">
         <div class="bowl-icon">🍖</div>
         <div class="bowl-name">Food Bowl</div>
@@ -244,7 +262,6 @@
         <div class="bowl-status" id="food-status">Waiting...</div>
         <div class="bowl-capacity" id="food-cap"></div>
       </div>
-
       <div class="bowl-card">
         <div class="bowl-icon">💧</div>
         <div class="bowl-name">Water Bowl</div>
@@ -253,7 +270,6 @@
         <div class="bowl-status" id="water-status">Waiting...</div>
         <div class="bowl-capacity" id="water-cap"></div>
       </div>
-
     </div>
     <div class="badge-row">
       <div class="badge badge-off" id="servo-badge"><div class="badge-dot"></div> Servo: --</div>
@@ -264,7 +280,6 @@
   <!-- ── 30-Min Consumption History ── -->
   <div class="card">
     <div class="card-title">Consumed — Last 30 Minutes</div>
-
     <div class="consumption-grid">
       <div class="cons-card">
         <div class="cons-icon">🍖</div>
@@ -281,8 +296,6 @@
         <div class="cons-sub" id="water-peak">Peak: --</div>
       </div>
     </div>
-
-    <!-- Timeline bar chart — 30 buckets of 1 min each -->
     <div class="timeline-wrap">
       <div class="timeline-label">
         <span>30 min ago</span>
@@ -302,15 +315,23 @@
     </div>
   </div>
 
-  <!-- ── Camera ── -->
+  <!-- ── Camera with AI Detection ── -->
   <div class="card">
-    <div class="card-title">Camera</div>
+    <div class="card-title" style="display:flex;align-items:center;justify-content:space-between">
+      <span>Camera</span>
+      <span id="ai-model-status" style="font-size:10px;color:#4a6080">AI: Loading...</span>
+    </div>
     <div class="cam-wrap">
       <div class="cam-placeholder" id="cam-placeholder">
         <div class="icon">📷</div>
         <p>No snapshot yet</p>
       </div>
-      <img id="snapshot" style="display:none">
+      <!-- Hidden img — source for canvas drawing -->
+      <img id="snapshot" crossorigin="anonymous" style="display:none">
+      <!-- Canvas renders image + detection boxes -->
+      <canvas id="det-canvas" style="display:none"></canvas>
+      <!-- AI detection status badge -->
+      <div class="ai-badge" id="ai-badge"></div>
       <div class="cam-timestamp" id="cam-ts" style="display:none"></div>
     </div>
     <button class="btn btn-primary" onclick="sendCmd('SNAPSHOT')">📸 Take Snapshot</button>
@@ -367,163 +388,213 @@ const CLIENT = "KIRA_WEB_" + Math.random().toString(16).substr(2, 4);
 let client    = null;
 let connected = false;
 
-// ── Bowl capacity config (grams) — adjust to your bowls ──────────────────────
-const FOOD_MAX_G  = 400;  // max grams your food bowl holds
-const WATER_MAX_G = 500;  // max grams your water bowl holds
-const FOOD_LOW_G  = 80;   // matches Nano threshold
+// ── Bowl capacity config ──────────────────────────────────────────────────────
+const FOOD_MAX_G  = 400;
+const WATER_MAX_G = 500;
+const FOOD_LOW_G  = 80;
 const WATER_LOW_G = 100;
 
-// ── Consumption history — 30 x 1-min buckets ─────────────────────────────────
+// ── Consumption history ───────────────────────────────────────────────────────
 const BUCKET_COUNT = 30;
-const BUCKET_MS    = 60000; // 1 minute per bucket
-
-// Each bucket stores: { foodStart, waterStart, foodConsumed, waterConsumed }
+const BUCKET_MS    = 60000;
 let history = Array.from({length: BUCKET_COUNT}, () =>
   ({ foodStart: null, waterStart: null, foodConsumed: 0, waterConsumed: 0 })
 );
+let currentBucket  = 0;
+let lastBucketTime = Date.now();
+let lastFoodGrams  = null;
+let lastWaterGrams = null;
 
-let currentBucket   = 0;
-let lastBucketTime  = Date.now();
-let lastFoodGrams   = null;
-let lastWaterGrams  = null;
+// ── AI Detection state ────────────────────────────────────────────────────────
+let detModel    = null;   // COCO-SSD model instance
+let modelReady  = false;  // true once loaded
 
-// ── Build timeline bar DOM ────────────────────────────────────────────────────
+// Cat + dog classes COCO-SSD supports
+const PET_CLASSES = ['cat', 'dog'];
+
+// Detection box colors
+const BOX_COLOR   = '#4eff91';
+const BOX_COLOR_2 = '#ffaa00';  // second pet if multiple
+
+// Load model after page load — non-blocking, runs in background
+function loadDetectionModel() {
+  // Wait until cocoSsd is available (scripts are defer loaded)
+  if (typeof cocoSsd === 'undefined') {
+    setTimeout(loadDetectionModel, 500);
+    return;
+  }
+  document.getElementById('ai-model-status').innerText = 'AI: Loading model...';
+  cocoSsd.load().then(model => {
+    detModel   = model;
+    modelReady = true;
+    document.getElementById('ai-model-status').innerText = 'AI: Ready ✓';
+    console.log('[KIRA AI] COCO-SSD model loaded');
+  }).catch(err => {
+    document.getElementById('ai-model-status').innerText = 'AI: Failed';
+    console.warn('[KIRA AI] Model load failed:', err);
+  });
+}
+
+// Run detection on the snapshot image, draw results on canvas
+async function runDetection(imgEl) {
+  const canvas  = document.getElementById('det-canvas');
+  const badge   = document.getElementById('ai-badge');
+  const ctx     = canvas.getContext('2d');
+
+  // Draw image on canvas first (always — even if model not ready)
+  canvas.width  = imgEl.naturalWidth  || imgEl.width  || 640;
+  canvas.height = imgEl.naturalHeight || imgEl.height || 480;
+  ctx.drawImage(imgEl, 0, 0, canvas.width, canvas.height);
+  canvas.style.display = 'block';
+
+  if (!modelReady || !detModel) {
+    badge.className   = 'ai-badge none';
+    badge.innerText   = '🔄 AI loading...';
+    return;
+  }
+
+  badge.className = 'ai-badge loading';
+  badge.innerText = '🔍 Detecting...';
+
+  try {
+    const predictions = await detModel.detect(imgEl);
+
+    // Filter only pet classes with confidence > 40%
+    const pets = predictions.filter(p =>
+      PET_CLASSES.includes(p.class) && p.score > 0.4
+    );
+
+    // Redraw image cleanly before boxes
+    ctx.drawImage(imgEl, 0, 0, canvas.width, canvas.height);
+
+    if (pets.length === 0) {
+      badge.className = 'ai-badge none';
+      badge.innerText = '🐾 No pet detected';
+      return;
+    }
+
+    // Draw bounding boxes
+    pets.forEach((pet, idx) => {
+      const [x, y, w, h] = pet.bbox;
+      const color = idx === 0 ? BOX_COLOR : BOX_COLOR_2;
+      const label = `${pet.class} ${Math.round(pet.score * 100)}%`;
+
+      // Box
+      ctx.strokeStyle = color;
+      ctx.lineWidth   = 2.5;
+      ctx.strokeRect(x, y, w, h);
+
+      // Corner accents — more elegant than full box
+      const cs = 14; // corner size
+      ctx.lineWidth = 3.5;
+      // Top-left
+      ctx.beginPath(); ctx.moveTo(x, y + cs); ctx.lineTo(x, y); ctx.lineTo(x + cs, y); ctx.stroke();
+      // Top-right
+      ctx.beginPath(); ctx.moveTo(x + w - cs, y); ctx.lineTo(x + w, y); ctx.lineTo(x + w, y + cs); ctx.stroke();
+      // Bottom-left
+      ctx.beginPath(); ctx.moveTo(x, y + h - cs); ctx.lineTo(x, y + h); ctx.lineTo(x + cs, y + h); ctx.stroke();
+      // Bottom-right
+      ctx.beginPath(); ctx.moveTo(x + w - cs, y + h); ctx.lineTo(x + w, y + h); ctx.lineTo(x + w, y + h - cs); ctx.stroke();
+
+      // Label background
+      ctx.font      = 'bold 12px sans-serif';
+      const tw      = ctx.measureText(label).width;
+      ctx.fillStyle = color;
+      ctx.fillRect(x, y - 20, tw + 10, 20);
+
+      // Label text
+      ctx.fillStyle = '#0a1628';
+      ctx.fillText(label, x + 5, y - 5);
+    });
+
+    // Update badge
+    const names = pets.map(p => p.class).join(' + ');
+    badge.className = 'ai-badge detected';
+    badge.innerText = `🐾 ${names} detected (${pets.length})`;
+
+    logItem(`AI: ${pets.length} pet(s) detected — ${names}`, 'success');
+
+  } catch (err) {
+    console.warn('[KIRA AI] Detection error:', err);
+    badge.className = 'ai-badge error';
+    badge.innerText = '⚠ Detection error';
+  }
+}
+
+// ── Timeline ─────────────────────────────────────────────────────────────────
 function buildTimeline() {
   const wrap = document.getElementById('timeline-bars');
   wrap.innerHTML = '';
   for (let i = 0; i < BUCKET_COUNT; i++) {
     const pair = document.createElement('div');
     pair.style.cssText = 'flex:1;display:flex;flex-direction:column;gap:2px;align-items:center;height:100%';
-
     const fb = document.createElement('div');
-    fb.className = 'tbar food-bar-t';
-    fb.id = `fb-${i}`;
-    fb.style.width = '100%';
-    fb.style.height = '3px';
-
+    fb.className = 'tbar food-bar-t'; fb.id = `fb-${i}`; fb.style.width = '100%'; fb.style.height = '3px';
     const wb = document.createElement('div');
-    wb.className = 'tbar water-bar-t';
-    wb.id = `wb-${i}`;
-    wb.style.width = '100%';
-    wb.style.height = '3px';
-
-    pair.appendChild(fb);
-    pair.appendChild(wb);
-    wrap.appendChild(pair);
+    wb.className = 'tbar water-bar-t'; wb.id = `wb-${i}`; wb.style.width = '100%'; wb.style.height = '3px';
+    pair.appendChild(fb); pair.appendChild(wb); wrap.appendChild(pair);
   }
 }
 
-// ── Update history when new sensor data arrives ───────────────────────────────
 function updateHistory(foodG, waterG) {
   const now = Date.now();
-
-  // Advance bucket if 1 min has passed
   if (now - lastBucketTime >= BUCKET_MS) {
     currentBucket = (currentBucket + 1) % BUCKET_COUNT;
     history[currentBucket] = { foodStart: null, waterStart: null, foodConsumed: 0, waterConsumed: 0 };
     lastBucketTime = now;
   }
-
   const bucket = history[currentBucket];
-
-  // Set start reference for this bucket
   if (bucket.foodStart  === null && foodG  !== null) bucket.foodStart  = foodG;
   if (bucket.waterStart === null && waterG !== null) bucket.waterStart = waterG;
-
-  // Consumed = start - current (weight dropped = consumed)
-  if (bucket.foodStart  !== null && foodG  !== null) {
-    const diff = bucket.foodStart - foodG;
-    bucket.foodConsumed  = Math.max(0, diff);
-  }
-  if (bucket.waterStart !== null && waterG !== null) {
-    const diff = bucket.waterStart - waterG;
-    bucket.waterConsumed = Math.max(0, diff);
-  }
-
+  if (bucket.foodStart  !== null && foodG  !== null) bucket.foodConsumed  = Math.max(0, bucket.foodStart  - foodG);
+  if (bucket.waterStart !== null && waterG !== null) bucket.waterConsumed = Math.max(0, bucket.waterStart - waterG);
   lastFoodGrams  = foodG;
   lastWaterGrams = waterG;
-
   renderHistory();
 }
 
 function renderHistory() {
-  // Find max for scaling
   let maxF = 1, maxW = 1;
+  history.forEach(b => { if (b.foodConsumed > maxF) maxF = b.foodConsumed; if (b.waterConsumed > maxW) maxW = b.waterConsumed; });
+  let totalFood = 0, totalWater = 0, peakFood = 0, peakWater = 0;
   history.forEach(b => {
-    if (b.foodConsumed  > maxF) maxF = b.foodConsumed;
-    if (b.waterConsumed > maxW) maxW = b.waterConsumed;
-  });
-
-  // Total consumed in last 30 min
-  let totalFood = 0, totalWater = 0;
-  let peakFood = 0, peakWater = 0;
-  history.forEach(b => {
-    totalFood  += b.foodConsumed;
-    totalWater += b.waterConsumed;
-    if (b.foodConsumed  > peakFood)  peakFood  = b.foodConsumed;
+    totalFood += b.foodConsumed; totalWater += b.waterConsumed;
+    if (b.foodConsumed > peakFood) peakFood = b.foodConsumed;
     if (b.waterConsumed > peakWater) peakWater = b.waterConsumed;
   });
-
-  // Update summary cards
   document.getElementById('food-consumed').innerText  = Math.round(totalFood);
   document.getElementById('water-consumed').innerText = Math.round(totalWater);
   document.getElementById('food-peak').innerText  = peakFood  > 0 ? `Peak: ${Math.round(peakFood)}g/min`  : 'Peak: --';
   document.getElementById('water-peak').innerText = peakWater > 0 ? `Peak: ${Math.round(peakWater)}g/min` : 'Peak: --';
-
-  // Update bar chart — chronological order from oldest to newest
   for (let i = 0; i < BUCKET_COUNT; i++) {
-    // Map bar index to history index (oldest first)
     const idx = (currentBucket + 1 + i) % BUCKET_COUNT;
     const b   = history[idx];
-
-    const fh = maxF > 0 ? (b.foodConsumed  / maxF) * 55 : 0;
-    const wh = maxW > 0 ? (b.waterConsumed / maxW) * 55 : 0;
-
-    const fb = document.getElementById(`fb-${i}`);
-    const wb = document.getElementById(`wb-${i}`);
-
-    if (fb) {
-      fb.style.height = Math.max(3, fh) + 'px';
-      const minsAgo = BUCKET_COUNT - i;
-      fb.setAttribute('data-tip', `${minsAgo}min ago: ${Math.round(b.foodConsumed)}g food`);
-    }
-    if (wb) {
-      wb.style.height = Math.max(3, wh) + 'px';
-      const minsAgo = BUCKET_COUNT - i;
-      wb.setAttribute('data-tip', `${minsAgo}min ago: ${Math.round(b.waterConsumed)}g water`);
-    }
+    const fh  = maxF > 0 ? (b.foodConsumed  / maxF) * 55 : 0;
+    const wh  = maxW > 0 ? (b.waterConsumed / maxW) * 55 : 0;
+    const fb  = document.getElementById(`fb-${i}`);
+    const wb  = document.getElementById(`wb-${i}`);
+    const minsAgo = BUCKET_COUNT - i;
+    if (fb) { fb.style.height = Math.max(3, fh) + 'px'; fb.setAttribute('data-tip', `${minsAgo}min ago: ${Math.round(b.foodConsumed)}g food`); }
+    if (wb) { wb.style.height = Math.max(3, wh) + 'px'; wb.setAttribute('data-tip', `${minsAgo}min ago: ${Math.round(b.waterConsumed)}g water`); }
   }
-
-  document.getElementById('history-updated').innerText =
-    'Updated ' + new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+  document.getElementById('history-updated').innerText = 'Updated ' + new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
 }
 
 // ── MQTT connect ──────────────────────────────────────────────────────────────
 function connect() {
-  if (typeof Paho === 'undefined') {
-    logItem("Waiting for MQTT library...", "alert");
-    setTimeout(connect, 1000);
-    return;
-  }
+  if (typeof Paho === 'undefined') { logItem("Waiting for MQTT library...", "alert"); setTimeout(connect, 1000); return; }
   try {
     client = new Paho.Client(BROKER, PORT, "/mqtt", CLIENT);
-
     client.onConnectionLost = (r) => {
-      connected = false;
-      setConnUI(false, "Disconnected");
+      connected = false; setConnUI(false, "Disconnected");
       logItem("Connection lost: " + r.errorMessage, "alert");
       setTimeout(connect, 5000);
     };
-
-    client.onMessageArrived = (msg) => {
-      handleMessage(msg.destinationName, msg.payloadString);
-    };
-
+    client.onMessageArrived = (msg) => { handleMessage(msg.destinationName, msg.payloadString); };
     client.connect({
       useSSL: true, userName: USER, password: PASS,
       onSuccess: () => {
-        connected = true;
-        setConnUI(true, "Connected");
+        connected = true; setConnUI(true, "Connected");
         logItem("Connected to HiveMQ Cloud", "success");
         client.subscribe("kira/sensors");
         client.subscribe("kira/camera/snapshot");
@@ -542,91 +613,62 @@ function connect() {
 // ── Message handler ───────────────────────────────────────────────────────────
 function handleMessage(topic, payload) {
   if (topic === "kira/sensors") {
-    try {
-      const d = JSON.parse(payload);
-      updateSensors(d);
-    } catch(e) { console.error("JSON Parse Error", e); }
+    try { updateSensors(JSON.parse(payload)); } catch(e) { console.error("JSON Parse Error", e); }
   }
   else if (topic === "kira/camera/snapshot") {
     const img = document.getElementById("snapshot");
+
+    // When image fully loaded — draw on canvas then run detection
+    img.onload = () => {
+      document.getElementById("cam-placeholder").style.display = "none";
+      document.getElementById("cam-ts").style.display  = "block";
+      document.getElementById("cam-ts").innerText = new Date().toLocaleTimeString();
+      runDetection(img);  // draw + detect
+    };
+
     img.src = "data:image/jpeg;base64," + payload;
-    img.style.display = "block";
-    document.getElementById("cam-placeholder").style.display = "none";
-    document.getElementById("cam-ts").style.display = "block";
-    document.getElementById("cam-ts").innerText = new Date().toLocaleTimeString();
     logItem("Snapshot received", "success");
   }
   else if (topic === "kira/alert") {
-    try {
-      const d = JSON.parse(payload);
-      const a = d.alert || payload;
-      logItem("⚠️ ALERT: " + a, "alert");
-    } catch { logItem("⚠️ " + payload, "alert"); }
+    try { const d = JSON.parse(payload); logItem("⚠️ ALERT: " + (d.alert || payload), "alert"); }
+    catch { logItem("⚠️ " + payload, "alert"); }
   }
 }
 
 // ── Sensor update ─────────────────────────────────────────────────────────────
 function updateSensors(d) {
-  // Food weight (grams)
   if (d.food_g !== undefined) {
-    const g   = parseFloat(d.food_g);
-    const pct = Math.min(100, Math.max(0, (g / FOOD_MAX_G) * 100));
-    const low = g <= FOOD_LOW_G;
-
-    const wEl  = document.getElementById('food-weight');
-    const bar  = document.getElementById('food-bar');
-    const stat = document.getElementById('food-status');
-    const cap  = document.getElementById('food-cap');
-
-    wEl.innerHTML  = Math.round(g) + '<span class="bowl-unit">g</span>';
-    wEl.className  = 'bowl-weight ' + (low ? 'low' : 'ok');
-    bar.style.width = pct + '%';
-    bar.className   = 'bowl-bar ' + (low ? 'low' : 'ok');
-    stat.innerText  = low ? '⚠ Refill needed' : 'Good';
-    cap.innerText   = `Max ~${FOOD_MAX_G}g`;
-
+    const g = parseFloat(d.food_g), pct = Math.min(100, Math.max(0, (g / FOOD_MAX_G) * 100)), low = g <= FOOD_LOW_G;
+    document.getElementById('food-weight').innerHTML = Math.round(g) + '<span class="bowl-unit">g</span>';
+    document.getElementById('food-weight').className = 'bowl-weight ' + (low ? 'low' : 'ok');
+    document.getElementById('food-bar').style.width  = pct + '%';
+    document.getElementById('food-bar').className    = 'bowl-bar ' + (low ? 'low' : 'ok');
+    document.getElementById('food-status').innerText = low ? '⚠ Refill needed' : 'Good';
+    document.getElementById('food-cap').innerText    = `Max ~${FOOD_MAX_G}g`;
     updateHistory(g, lastWaterGrams);
   }
-
-  // Water weight (grams)
   if (d.water_g !== undefined) {
-    const g   = parseFloat(d.water_g);
-    const pct = Math.min(100, Math.max(0, (g / WATER_MAX_G) * 100));
-    const low = g <= WATER_LOW_G;
-
-    const wEl  = document.getElementById('water-weight');
-    const bar  = document.getElementById('water-bar');
-    const stat = document.getElementById('water-status');
-    const cap  = document.getElementById('water-cap');
-
-    wEl.innerHTML  = Math.round(g) + '<span class="bowl-unit">g</span>';
-    wEl.className  = 'bowl-weight ' + (low ? 'low' : 'ok');
-    bar.style.width = pct + '%';
-    bar.className   = 'bowl-bar ' + (low ? 'low' : 'ok');
-    stat.innerText  = low ? '⚠ Refill needed' : 'Good';
-    cap.innerText   = `Max ~${WATER_MAX_G}g`;
-
+    const g = parseFloat(d.water_g), pct = Math.min(100, Math.max(0, (g / WATER_MAX_G) * 100)), low = g <= WATER_LOW_G;
+    document.getElementById('water-weight').innerHTML = Math.round(g) + '<span class="bowl-unit">g</span>';
+    document.getElementById('water-weight').className = 'bowl-weight ' + (low ? 'low' : 'ok');
+    document.getElementById('water-bar').style.width  = pct + '%';
+    document.getElementById('water-bar').className    = 'bowl-bar ' + (low ? 'low' : 'ok');
+    document.getElementById('water-status').innerText = low ? '⚠ Refill needed' : 'Good';
+    document.getElementById('water-cap').innerText    = `Max ~${WATER_MAX_G}g`;
     updateHistory(lastFoodGrams, g);
   }
-
-  // Battery / power
   if (d.battery !== undefined) {
     const b = document.getElementById('power-batt');
-    b.innerText = d.battery + "%";
-    b.className = 'power-value ' + (d.battery <= 25 ? 'red' : 'green');
+    b.innerText = d.battery + "%"; b.className = 'power-value ' + (d.battery <= 25 ? 'red' : 'green');
   }
   if (d.wall !== undefined) {
     const p = document.getElementById('power-src');
-    p.innerText = d.wall ? "Wall socket" : "Battery";
-    p.className = 'power-value ' + (d.wall ? 'green' : 'orange');
+    p.innerText = d.wall ? "Wall socket" : "Battery"; p.className = 'power-value ' + (d.wall ? 'green' : 'orange');
   }
   if (d.wifi !== undefined) {
     const w = document.getElementById('wifi-status');
-    w.innerText = d.wifi ? "Connected" : "Offline";
-    w.className = 'power-value ' + (d.wifi ? 'green' : 'red');
+    w.innerText = d.wifi ? "Connected" : "Offline"; w.className = 'power-value ' + (d.wifi ? 'green' : 'red');
   }
-
-  // Badges
   if (d.servo !== undefined) {
     const s = document.getElementById('servo-badge');
     s.innerHTML = `<div class="badge-dot"></div> Servo: ${d.servo}`;
@@ -652,27 +694,22 @@ function tareScales() {
   if (!connected) return logItem("Not connected", "alert");
   if (!confirm("Ensure both bowls are EMPTY before taring. Proceed?")) return;
   sendCmd('TARE:ALL');
-  // Reset history baselines
   history = Array.from({length: BUCKET_COUNT}, () =>
     ({ foodStart: null, waterStart: null, foodConsumed: 0, waterConsumed: 0 })
   );
-  lastFoodGrams  = null;
-  lastWaterGrams = null;
+  lastFoodGrams = null; lastWaterGrams = null;
   renderHistory();
   logItem("Tare command sent — baselines reset", "success");
 }
 
-// ── Toggle helpers ────────────────────────────────────────────────────────────
 let servoIsOpen = false;
 function toggleServo() {
   if (!servoIsOpen) {
-    sendCmd('SERVO:OPEN');
-    servoIsOpen = true;
+    sendCmd('SERVO:OPEN'); servoIsOpen = true;
     document.getElementById('servo-btn').className = 'btn btn-warn';
     document.getElementById('servo-btn').innerHTML = '🔧 Close Flap';
   } else {
-    sendCmd('SERVO:CLOSE');
-    servoIsOpen = false;
+    sendCmd('SERVO:CLOSE'); servoIsOpen = false;
     document.getElementById('servo-btn').className = 'btn btn-secondary';
     document.getElementById('servo-btn').innerHTML = '🔧 Open Flap';
   }
@@ -681,19 +718,16 @@ function toggleServo() {
 let valveIsOpen = false;
 function toggleValve() {
   if (!valveIsOpen) {
-    sendCmd('VALVE:OPEN');
-    valveIsOpen = true;
+    sendCmd('VALVE:OPEN'); valveIsOpen = true;
     document.getElementById('valve-btn').className = 'btn btn-warn';
     document.getElementById('valve-btn').innerHTML = '🔧 Close Valve';
   } else {
-    sendCmd('VALVE:CLOSE');
-    valveIsOpen = false;
+    sendCmd('VALVE:CLOSE'); valveIsOpen = false;
     document.getElementById('valve-btn').className = 'btn btn-secondary';
     document.getElementById('valve-btn').innerHTML = '🔧 Open Valve';
   }
 }
 
-// ── UI helpers ────────────────────────────────────────────────────────────────
 function setConnUI(ok, txt) {
   document.getElementById("conn-dot").className = "conn-dot" + (ok ? " on" : "");
   document.getElementById("conn-label").innerText = txt;
@@ -714,6 +748,7 @@ window.onload = () => {
   buildTimeline();
   renderHistory();
   setTimeout(connect, 500);
+  setTimeout(loadDetectionModel, 2000);  // load AI model 2s after page load
 };
 </script>
 </body>
