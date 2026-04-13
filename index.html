@@ -7,13 +7,19 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0a1628">
 <title>KIRA Pet Feeder</title>
+
+<!-- MQTT over WebSocket -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.1.0/paho-mqtt.min.js"></script>
 
-<!-- AI Detection — TensorFlow.js + COCO-SSD (loaded async, non-blocking) -->
+<!-- TensorFlow.js + COCO-SSD for pet detection (defer = non-blocking) -->
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.11.0/dist/tf.min.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js" defer></script>
 
+<!-- SheetJS for Excel export -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
 <style>
+  /* ── Reset & Base ── */
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
   body {
@@ -24,6 +30,7 @@
     padding-bottom: 32px;
   }
 
+  /* ── Header ── */
   .header {
     background: #0d1f35;
     border-bottom: 1px solid #1e3a5f;
@@ -35,14 +42,39 @@
     top: 0;
     z-index: 100;
   }
-  .logo { font-size: 22px; font-weight: 700; color: #4a9eff; letter-spacing: 1px; }
-  .logo span { color: #e0e8f0; font-weight: 300; font-size: 14px; margin-left: 4px; }
-  .conn-dot { width: 9px; height: 9px; border-radius: 50%; background: #ff4444; transition: background 0.3s; }
-  .conn-dot.on { background: #4eff91; box-shadow: 0 0 8px #4eff91; }
+  .logo {
+    font-size: 22px;
+    font-weight: 700;
+    color: #4a9eff;
+    letter-spacing: 1px;
+  }
+  .logo span {
+    color: #e0e8f0;
+    font-weight: 300;
+    font-size: 14px;
+    margin-left: 4px;
+  }
+  .conn-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: #ff4444;
+    transition: background 0.3s;
+  }
+  .conn-dot.on {
+    background: #4eff91;
+    box-shadow: 0 0 8px #4eff91;
+  }
   .conn-label { font-size: 12px; color: #8899aa; }
 
-  .main { padding: 16px; max-width: 480px; margin: 0 auto; }
+  /* ── Layout ── */
+  .main {
+    padding: 16px;
+    max-width: 480px;
+    margin: 0 auto;
+  }
 
+  /* ── Card ── */
   .card {
     background: #0d1f35;
     border: 1px solid #1e3a5f;
@@ -59,8 +91,27 @@
     margin-bottom: 14px;
   }
 
+  /* ── Connection Banner ── */
+  #conn-banner {
+    background: #2a0d0d;
+    border: 1px solid #5a1a1a;
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin-bottom: 14px;
+    font-size: 13px;
+    color: #ff8888;
+    display: none;
+    align-items: center;
+    gap: 10px;
+  }
+  #conn-banner.show { display: flex; }
+
   /* ── Bowl Weight Cards ── */
-  .bowl-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .bowl-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
   .bowl-card {
     background: #091525;
     border: 1px solid #1a3050;
@@ -78,9 +129,14 @@
     line-height: 1;
     transition: color 0.4s;
   }
-  .bowl-weight.low  { color: #ff6b35; }
-  .bowl-weight.ok   { color: #4eff91; }
-  .bowl-unit { font-size: 13px; color: #8899aa; font-weight: 400; margin-left: 2px; }
+  .bowl-weight.low { color: #ff6b35; }
+  .bowl-weight.ok  { color: #4eff91; }
+  .bowl-unit {
+    font-size: 13px;
+    color: #8899aa;
+    font-weight: 400;
+    margin-left: 2px;
+  }
   .bowl-bar-bg {
     background: #0a1628;
     border-radius: 6px;
@@ -95,13 +151,42 @@
     transition: width 0.6s ease, background 0.4s;
     width: 0%;
   }
-  .bowl-bar.low  { background: #ff6b35; }
-  .bowl-bar.ok   { background: #4eff91; }
-  .bowl-status { font-size: 11px; color: #8899aa; }
+  .bowl-bar.low { background: #ff6b35; }
+  .bowl-bar.ok  { background: #4eff91; }
+  .bowl-status  { font-size: 11px; color: #8899aa; }
   .bowl-capacity { font-size: 10px; color: #4a6080; margin-top: 4px; }
 
+  /* ── Badges ── */
+  .badge-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 12px;
+  }
+  .badge {
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .badge-dot { width: 6px; height: 6px; border-radius: 50%; }
+  .badge-ok   { background: #0d3020; color: #4eff91; }
+  .badge-ok   .badge-dot { background: #4eff91; }
+  .badge-warn { background: #3d2000; color: #ffaa00; }
+  .badge-warn .badge-dot { background: #ffaa00; }
+  .badge-off  { background: #1a1a2e; color: #8899aa; }
+  .badge-off  .badge-dot { background: #8899aa; }
+
   /* ── Consumption History ── */
-  .consumption-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+  .consumption-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
   .cons-card {
     background: #091525;
     border: 1px solid #1a3050;
@@ -109,14 +194,33 @@
     padding: 14px;
     text-align: center;
   }
-  .cons-icon { font-size: 20px; margin-bottom: 4px; }
-  .cons-label { font-size: 10px; color: #8899aa; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .cons-icon  { font-size: 20px; margin-bottom: 4px; }
+  .cons-label {
+    font-size: 10px;
+    color: #8899aa;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
   .cons-value { font-size: 22px; font-weight: 700; color: #4a9eff; }
   .cons-unit  { font-size: 11px; color: #8899aa; }
   .cons-sub   { font-size: 10px; color: #4a6080; margin-top: 4px; }
-  .timeline-wrap { margin-top: 14px; }
-  .timeline-label { font-size: 10px; color: #4a6080; display: flex; justify-content: space-between; margin-bottom: 6px; }
-  .timeline-bars  { display: flex; align-items: flex-end; gap: 3px; height: 60px; }
+
+  /* ── Timeline Bar Chart ── */
+  .timeline-wrap  { margin-top: 14px; }
+  .timeline-label {
+    font-size: 10px;
+    color: #4a6080;
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 6px;
+  }
+  .timeline-bars {
+    display: flex;
+    align-items: flex-end;
+    gap: 3px;
+    height: 60px;
+  }
   .tbar {
     flex: 1;
     border-radius: 3px 3px 0 0;
@@ -127,6 +231,7 @@
   }
   .tbar.food-bar-t  { background: #2a7fd4; }
   .tbar.water-bar-t { background: #1a6050; }
+  /* Tooltip on hover */
   .tbar:hover::after {
     content: attr(data-tip);
     position: absolute;
@@ -142,10 +247,20 @@
     z-index: 10;
     pointer-events: none;
   }
-  .timeline-legend { display: flex; gap: 14px; margin-top: 8px; }
-  .legend-dot { width: 8px; height: 8px; border-radius: 2px; display: inline-block; margin-right: 4px; }
+  .timeline-legend {
+    display: flex;
+    gap: 14px;
+    margin-top: 8px;
+  }
+  .legend-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+    display: inline-block;
+    margin-right: 4px;
+  }
 
-  /* ── Camera — UPDATED for canvas overlay ── */
+  /* ── Camera ── */
   .cam-wrap {
     background: #040d1a;
     border-radius: 12px;
@@ -157,22 +272,23 @@
     justify-content: center;
     margin-bottom: 12px;
   }
-  /* Image hidden — canvas shows the image + boxes */
-  #snapshot { display: none; }
-  #det-canvas {
-    width: 100%;
-    display: block;
-    border-radius: 12px;
-  }
+  /* img is hidden — canvas renders image + bounding boxes */
+  #snapshot    { display: none; }
+  #det-canvas  { width: 100%; display: block; border-radius: 12px; }
   .cam-placeholder { text-align: center; color: #2a4a6a; padding: 40px 20px; }
   .cam-placeholder .icon { font-size: 40px; margin-bottom: 8px; }
   .cam-timestamp {
-    position: absolute; bottom: 8px; right: 10px;
-    font-size: 11px; color: rgba(255,255,255,0.6);
-    background: rgba(0,0,0,0.5); padding: 3px 8px; border-radius: 6px;
+    position: absolute;
+    bottom: 8px;
+    right: 10px;
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.6);
+    background: rgba(0, 0, 0, 0.5);
+    padding: 3px 8px;
+    border-radius: 6px;
   }
 
-  /* ── AI detection status badge ── */
+  /* ── AI Detection Badge ── */
   .ai-badge {
     position: absolute;
     top: 8px;
@@ -183,39 +299,107 @@
     border-radius: 6px;
     display: none;
   }
-  .ai-badge.loading { background: rgba(74,158,255,0.2); color: #4a9eff; display: block; }
-  .ai-badge.detected { background: rgba(78,255,145,0.2); color: #4eff91; display: block; }
-  .ai-badge.none { background: rgba(136,153,170,0.2); color: #8899aa; display: block; }
-  .ai-badge.error { background: rgba(255,107,53,0.15); color: #ff6b35; display: block; }
+  .ai-badge.loading  { background: rgba(74, 158, 255, 0.2);  color: #4a9eff; display: block; }
+  .ai-badge.detected { background: rgba(78, 255, 145, 0.2);  color: #4eff91; display: block; }
+  .ai-badge.none     { background: rgba(136, 153, 170, 0.2); color: #8899aa; display: block; }
+  .ai-badge.error    { background: rgba(255, 107, 53, 0.15); color: #ff6b35; display: block; }
 
   /* ── Buttons ── */
-  .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .btn-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
   .btn {
-    padding: 14px 12px; border: none; border-radius: 12px;
-    font-size: 14px; font-weight: 600; cursor: pointer;
-    display: flex; align-items: center; justify-content: center; gap: 8px; transition: 0.1s;
+    padding: 14px 12px;
+    border: none;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: opacity 0.1s, transform 0.1s;
   }
   .btn:active { transform: scale(0.97); }
-  .btn-primary   { background: #4a9eff; color: #fff; grid-column: 1 / -1; }
-  .btn-green     { background: #0d4030; color: #4eff91; border: 1px solid #1e6040; }
-  .btn-orange    { background: #3d2000; color: #ffaa00; border: 1px solid #5a3000; }
-  .btn-secondary { background: #0d1f35; color: #8899aa; border: 1px solid #1e3a5f; }
-  .btn-warn      { background: #3d0d0d; color: #ff6b35; border: 1px solid #6a1a1a; }
-  .btn-tare      { background: #1a1a3a; color: #8888ff; border: 1px solid #2a2a5a; grid-column: 1 / -1; }
+  .btn-primary   { background: #4a9eff;  color: #fff;    grid-column: 1 / -1; }
+  .btn-green     { background: #0d4030;  color: #4eff91; border: 1px solid #1e6040; }
+  .btn-orange    { background: #3d2000;  color: #ffaa00; border: 1px solid #5a3000; }
+  .btn-secondary { background: #0d1f35;  color: #8899aa; border: 1px solid #1e3a5f; }
+  .btn-warn      { background: #3d0d0d;  color: #ff6b35; border: 1px solid #6a1a1a; }
+  .btn-tare      { background: #1a1a3a;  color: #8888ff; border: 1px solid #2a2a5a; grid-column: 1 / -1; }
+  .btn-export    { background: #0d3020;  color: #4eff91; border: 1px solid #1e6040; }
+  .btn-danger    { background: #3d0d0d;  color: #ff6b35; border: 1px solid #6a1a1a; }
 
-  /* ── Badges ── */
-  .badge-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
-  .badge { font-size: 11px; padding: 4px 10px; border-radius: 20px; font-weight: 600; display: flex; align-items: center; gap: 5px; }
-  .badge-dot { width: 6px; height: 6px; border-radius: 50%; }
-  .badge-ok   { background: #0d3020; color: #4eff91; }
-  .badge-ok .badge-dot   { background: #4eff91; }
-  .badge-warn { background: #3d2000; color: #ffaa00; }
-  .badge-warn .badge-dot { background: #ffaa00; }
-  .badge-off  { background: #1a1a2e; color: #8899aa; }
-  .badge-off .badge-dot  { background: #8899aa; }
+  /* ── Data Log ── */
+  .datalog-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  .stat-box {
+    background: #091525;
+    border: 1px solid #1a3050;
+    border-radius: 10px;
+    padding: 10px;
+    text-align: center;
+  }
+  .stat-val   { font-size: 18px; font-weight: 700; color: #4a9eff; }
+  .stat-label { font-size: 10px; color: #8899aa; margin-top: 2px; }
+  .datalog-table-wrap {
+    max-height: 220px;
+    overflow-y: auto;
+    border: 1px solid #1a3050;
+    border-radius: 10px;
+    margin-bottom: 12px;
+  }
+  .datalog-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+  }
+  .datalog-table th {
+    background: #091525;
+    color: #4a9eff;
+    padding: 8px 6px;
+    text-align: left;
+    position: sticky;
+    top: 0;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 600;
+  }
+  .datalog-table td {
+    padding: 6px 6px;
+    border-bottom: 1px solid #0d1f35;
+    color: #8899aa;
+    white-space: nowrap;
+  }
+  .datalog-table tr:last-child td { border-bottom: none; }
+  .datalog-table tr:hover td { background: #091525; }
 
-  /* ── Power ── */
-  .power-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #1a3050; }
+  /* Event type colors in data log */
+  .ev-sensor   { color: #4a9eff; }
+  .ev-feed     { color: #4eff91; }
+  .ev-water    { color: #4a9eff; }
+  .ev-motion   { color: #ffaa00; }
+  .ev-alert    { color: #ff6b35; }
+  .ev-snapshot { color: #8888ff; }
+  .ev-tare     { color: #8888ff; }
+  .ev-system   { color: #8899aa; }
+
+  /* ── Power & System ── */
+  .power-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid #1a3050;
+  }
   .power-row:last-child { border-bottom: none; }
   .power-label { font-size: 13px; color: #8899aa; }
   .power-value { font-size: 13px; font-weight: 600; color: #e0e8f0; }
@@ -223,63 +407,90 @@
   .power-value.orange { color: #ffaa00; }
   .power-value.red    { color: #ff6b35; }
 
-  /* ── Log ── */
-  #log { max-height: 180px; overflow-y: auto; font-size: 12px; color: #8899aa; }
-  .log-item { padding: 4px 0; border-bottom: 1px solid #0d1f35; }
-  .log-time { color: #4a9eff; margin-right: 6px; font-weight: 600; }
-  .success { color: #4eff91; }
-  .alert   { color: #ff6b35; }
-
-  #conn-banner {
-    background: #2a0d0d; border: 1px solid #5a1a1a; border-radius: 10px; padding: 12px 16px;
-    margin-bottom: 14px; font-size: 13px; color: #ff8888; display: none; align-items: center; gap: 10px;
+  /* ── Activity Log ── */
+  #log {
+    max-height: 180px;
+    overflow-y: auto;
+    font-size: 12px;
+    color: #8899aa;
   }
-  #conn-banner.show { display: flex; }
+  .log-item {
+    padding: 4px 0;
+    border-bottom: 1px solid #0d1f35;
+  }
+  .log-time  { color: #4a9eff; margin-right: 6px; font-weight: 600; }
+  .success   { color: #4eff91; }
+  .alert     { color: #ff6b35; }
 </style>
 </head>
 <body>
 
+<!-- ── Header ── -->
 <div class="header">
   <div class="logo">KIRA <span>Smart Feeder</span></div>
-  <div style="display:flex;align-items:center;gap:8px">
+  <div style="display:flex; align-items:center; gap:8px;">
     <div class="conn-dot" id="conn-dot"></div>
     <div class="conn-label" id="conn-label">Connecting...</div>
   </div>
 </div>
 
 <div class="main">
-  <div id="conn-banner">⚠️ <span id="conn-banner-text">Not connected to KIRA</span></div>
 
-  <!-- ── Bowl Weight Card ── -->
+  <!-- Connection warning banner -->
+  <div id="conn-banner">
+    ⚠️ <span id="conn-banner-text">Not connected to KIRA</span>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════
+       BOWL WEIGHT
+  ══════════════════════════════════════════════════ -->
   <div class="card">
     <div class="card-title">Bowl Weight</div>
     <div class="bowl-row">
+
       <div class="bowl-card">
         <div class="bowl-icon">🍖</div>
         <div class="bowl-name">Food Bowl</div>
-        <div class="bowl-weight ok" id="food-weight">--<span class="bowl-unit">g</span></div>
-        <div class="bowl-bar-bg"><div class="bowl-bar ok" id="food-bar"></div></div>
-        <div class="bowl-status" id="food-status">Waiting...</div>
+        <div class="bowl-weight ok" id="food-weight">
+          --<span class="bowl-unit">g</span>
+        </div>
+        <div class="bowl-bar-bg">
+          <div class="bowl-bar ok" id="food-bar"></div>
+        </div>
+        <div class="bowl-status"   id="food-status">Waiting...</div>
         <div class="bowl-capacity" id="food-cap"></div>
       </div>
+
       <div class="bowl-card">
         <div class="bowl-icon">💧</div>
         <div class="bowl-name">Water Bowl</div>
-        <div class="bowl-weight ok" id="water-weight">--<span class="bowl-unit">g</span></div>
-        <div class="bowl-bar-bg"><div class="bowl-bar ok" id="water-bar"></div></div>
-        <div class="bowl-status" id="water-status">Waiting...</div>
+        <div class="bowl-weight ok" id="water-weight">
+          --<span class="bowl-unit">g</span>
+        </div>
+        <div class="bowl-bar-bg">
+          <div class="bowl-bar ok" id="water-bar"></div>
+        </div>
+        <div class="bowl-status"   id="water-status">Waiting...</div>
         <div class="bowl-capacity" id="water-cap"></div>
       </div>
+
     </div>
     <div class="badge-row">
-      <div class="badge badge-off" id="servo-badge"><div class="badge-dot"></div> Servo: --</div>
-      <div class="badge badge-off" id="sol-badge"><div class="badge-dot"></div> Valve: --</div>
+      <div class="badge badge-off" id="servo-badge">
+        <div class="badge-dot"></div> Servo: --
+      </div>
+      <div class="badge badge-off" id="sol-badge">
+        <div class="badge-dot"></div> Valve: --
+      </div>
     </div>
   </div>
 
-  <!-- ── 30-Min Consumption History ── -->
+  <!-- ══════════════════════════════════════════════════
+       30-MIN CONSUMPTION HISTORY
+  ══════════════════════════════════════════════════ -->
   <div class="card">
     <div class="card-title">Consumed — Last 30 Minutes</div>
+
     <div class="consumption-grid">
       <div class="cons-card">
         <div class="cons-icon">🍖</div>
@@ -296,6 +507,7 @@
         <div class="cons-sub" id="water-peak">Peak: --</div>
       </div>
     </div>
+
     <div class="timeline-wrap">
       <div class="timeline-label">
         <span>30 min ago</span>
@@ -303,57 +515,120 @@
         <span>Now</span>
       </div>
       <div class="timeline-bars" id="timeline-bars"></div>
-      <div class="timeline-legend" style="margin-top:10px">
-        <div style="font-size:11px;color:#8899aa;display:flex;align-items:center">
-          <span class="legend-dot" style="background:#2a7fd4"></span>Food
+      <div class="timeline-legend" style="margin-top:10px;">
+        <div style="font-size:11px; color:#8899aa; display:flex; align-items:center;">
+          <span class="legend-dot" style="background:#2a7fd4;"></span>Food
         </div>
-        <div style="font-size:11px;color:#8899aa;display:flex;align-items:center">
-          <span class="legend-dot" style="background:#1a6050"></span>Water
+        <div style="font-size:11px; color:#8899aa; display:flex; align-items:center;">
+          <span class="legend-dot" style="background:#1a6050;"></span>Water
         </div>
-        <div style="font-size:11px;color:#4a6080;margin-left:auto" id="history-updated">No data yet</div>
+        <div style="font-size:11px; color:#4a6080; margin-left:auto;" id="history-updated">
+          No data yet
+        </div>
       </div>
     </div>
   </div>
 
-  <!-- ── Camera with AI Detection ── -->
+  <!-- ══════════════════════════════════════════════════
+       CAMERA + AI DETECTION
+  ══════════════════════════════════════════════════ -->
   <div class="card">
-    <div class="card-title" style="display:flex;align-items:center;justify-content:space-between">
+    <div class="card-title" style="display:flex; align-items:center; justify-content:space-between;">
       <span>Camera</span>
-      <span id="ai-model-status" style="font-size:10px;color:#4a6080">AI: Loading...</span>
+      <span id="ai-model-status" style="font-size:10px; color:#4a6080;">AI: Loading...</span>
     </div>
     <div class="cam-wrap">
       <div class="cam-placeholder" id="cam-placeholder">
         <div class="icon">📷</div>
         <p>No snapshot yet</p>
       </div>
-      <!-- Hidden img — source for canvas drawing -->
-      <img id="snapshot" crossorigin="anonymous" style="display:none">
-      <!-- Canvas renders image + detection boxes -->
-      <canvas id="det-canvas" style="display:none"></canvas>
-      <!-- AI detection status badge -->
+      <!-- Hidden img element — used as source for canvas rendering -->
+      <img id="snapshot" crossorigin="anonymous" style="display:none;">
+      <!-- Canvas renders the image + AI bounding boxes on top -->
+      <canvas id="det-canvas" style="display:none;"></canvas>
       <div class="ai-badge" id="ai-badge"></div>
-      <div class="cam-timestamp" id="cam-ts" style="display:none"></div>
+      <div class="cam-timestamp" id="cam-ts" style="display:none;"></div>
     </div>
     <button class="btn btn-primary" onclick="sendCmd('SNAPSHOT')">📸 Take Snapshot</button>
   </div>
 
-  <!-- ── Controls ── -->
+  <!-- ══════════════════════════════════════════════════
+       CONTROLS
+  ══════════════════════════════════════════════════ -->
   <div class="card">
     <div class="card-title">Controls</div>
+
     <div class="btn-row">
       <button class="btn btn-green"  onclick="sendCmd('FEED:NOW')">🍖 Feed Now</button>
       <button class="btn btn-orange" onclick="sendCmd('WATER:NOW')">💧 Water Now</button>
     </div>
-    <div class="btn-row" style="margin-top:10px">
+
+    <div class="btn-row" style="margin-top:10px;">
       <button id="servo-btn" class="btn btn-secondary" onclick="toggleServo()">🔧 Open Flap</button>
       <button id="valve-btn" class="btn btn-secondary" onclick="toggleValve()">🔧 Open Valve</button>
     </div>
-    <div class="btn-row" style="margin-top:10px">
+
+    <div class="btn-row" style="margin-top:10px;">
       <button class="btn btn-tare" onclick="tareScales()">⚖️ Tare Scales (empty bowls first)</button>
     </div>
   </div>
 
-  <!-- ── Power & System ── -->
+  <!-- ══════════════════════════════════════════════════
+       DATA LOG — localStorage persistent storage
+  ══════════════════════════════════════════════════ -->
+  <div class="card">
+    <div class="card-title" style="display:flex; align-items:center; justify-content:space-between;">
+      <span>Data Log</span>
+      <span style="font-size:10px; color:#4a6080;" id="log-storage-info"></span>
+    </div>
+
+    <!-- Stats row -->
+    <div class="datalog-stats">
+      <div class="stat-box">
+        <div class="stat-val" id="log-total-rows">0</div>
+        <div class="stat-label">Total Rows</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-val" id="log-days">0</div>
+        <div class="stat-label">Days</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-val" id="log-size">0 KB</div>
+        <div class="stat-label">Storage</div>
+      </div>
+    </div>
+
+    <!-- Table — shows last 50 entries, newest first -->
+    <div class="datalog-table-wrap">
+      <table class="datalog-table">
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>Event</th>
+            <th>Food (g)</th>
+            <th>Water (g)</th>
+            <th>Detail</th>
+          </tr>
+        </thead>
+        <tbody id="log-table-body">
+          <tr>
+            <td colspan="5" style="text-align:center; padding:20px; color:#4a6080;">
+              No data yet
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-export" onclick="exportExcel()">📊 Export Excel</button>
+      <button class="btn btn-danger" onclick="clearDataLog()">🗑 Clear Log</button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════
+       POWER & SYSTEM
+  ══════════════════════════════════════════════════ -->
   <div class="card">
     <div class="card-title">Power & System</div>
     <div class="power-row">
@@ -370,15 +645,20 @@
     </div>
   </div>
 
-  <!-- ── Activity Log ── -->
+  <!-- ══════════════════════════════════════════════════
+       ACTIVITY LOG (in-session only)
+  ══════════════════════════════════════════════════ -->
   <div class="card">
     <div class="card-title">Activity Log</div>
     <div id="log"></div>
   </div>
-</div>
+
+</div><!-- /main -->
 
 <script>
-// ── MQTT config ───────────────────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════════════════════
+// MQTT CONFIG
+// ════════════════════════════════════════════════════════════════════════════
 const BROKER = "0b5088bcba2d4f4383816bdfe8ca662a.s1.eu.hivemq.cloud";
 const PORT   = 8884;
 const USER   = "NIVARANTECH";
@@ -388,68 +668,254 @@ const CLIENT = "KIRA_WEB_" + Math.random().toString(16).substr(2, 4);
 let client    = null;
 let connected = false;
 
-// ── Bowl capacity config ──────────────────────────────────────────────────────
-const FOOD_MAX_G  = 400;
-const WATER_MAX_G = 500;
-const FOOD_LOW_G  = 80;
-const WATER_LOW_G = 100;
+// ════════════════════════════════════════════════════════════════════════════
+// BOWL CONFIG — adjust to match your physical bowls
+// ════════════════════════════════════════════════════════════════════════════
+const FOOD_MAX_G  = 400;   // max grams food bowl holds
+const WATER_MAX_G = 500;   // max grams water bowl holds
+const FOOD_LOW_G  = 80;    // alert threshold — matches Nano firmware
+const WATER_LOW_G = 100;   // alert threshold — matches Nano firmware
 
-// ── Consumption history ───────────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════════════════════
+// 30-MIN CONSUMPTION HISTORY
+// 30 buckets × 1 minute each = 30 minutes of rolling data
+// ════════════════════════════════════════════════════════════════════════════
 const BUCKET_COUNT = 30;
-const BUCKET_MS    = 60000;
-let history = Array.from({length: BUCKET_COUNT}, () =>
-  ({ foodStart: null, waterStart: null, foodConsumed: 0, waterConsumed: 0 })
-);
+const BUCKET_MS    = 60000;  // 1 minute per bucket
+
+let history = Array.from({ length: BUCKET_COUNT }, () => ({
+  foodStart:    null,
+  waterStart:   null,
+  foodConsumed: 0,
+  waterConsumed: 0
+}));
+
 let currentBucket  = 0;
 let lastBucketTime = Date.now();
 let lastFoodGrams  = null;
 let lastWaterGrams = null;
 
-// ── AI Detection state ────────────────────────────────────────────────────────
-let detModel    = null;   // COCO-SSD model instance
-let modelReady  = false;  // true once loaded
+// ════════════════════════════════════════════════════════════════════════════
+// AI DETECTION STATE
+// ════════════════════════════════════════════════════════════════════════════
+let detModel   = null;
+let modelReady = false;
 
-// Cat + dog classes COCO-SSD supports
 const PET_CLASSES = ['cat', 'dog'];
+const BOX_COLOR   = '#4eff91';   // primary detection box
+const BOX_COLOR_2 = '#ffaa00';   // second pet if multiple detected
 
-// Detection box colors
-const BOX_COLOR   = '#4eff91';
-const BOX_COLOR_2 = '#ffaa00';  // second pet if multiple
+// ════════════════════════════════════════════════════════════════════════════
+// DATA LOG — localStorage persistent storage
+// Survives page refresh, browser close, and device sleep
+// Cleared only by user action or browser cache clear
+// ════════════════════════════════════════════════════════════════════════════
+const STORAGE_KEY    = 'kira_datalog_v1';
+const MAX_LOG_ROWS   = 5000;    // ~2MB — safe limit for localStorage
+const SENSOR_LOG_EVERY = 6;     // log sensor data every 6th update (~60 seconds at 10s interval)
 
-// Load model after page load — non-blocking, runs in background
+let sensorLogCounter = 0;
+
+// Read all rows from localStorage
+function getLog() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    console.warn('[DataLog] Read failed:', e);
+    return [];
+  }
+}
+
+// Write rows to localStorage — trims to MAX_LOG_ROWS if needed
+function saveLog(rows) {
+  try {
+    if (rows.length > MAX_LOG_ROWS) {
+      rows = rows.slice(-MAX_LOG_ROWS);
+    }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(rows));
+  } catch (e) {
+    console.warn('[DataLog] Write failed — storage full?', e);
+  }
+}
+
+// Add a single row to the log
+// event: 'Sensor' | 'Feed' | 'Water' | 'Motion' | 'Alert' | 'Snapshot' | 'Tare' | 'System'
+function addLogRow(event, detail = '', foodG = null, waterG = null) {
+  const now  = new Date();
+  const rows = getLog();
+
+  rows.push({
+    ts:      now.getTime(),
+    date:    now.toLocaleDateString('en-IN'),
+    time:    now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+    event:   event,
+    detail:  detail,
+    food_g:  foodG  !== null ? Math.round(foodG  * 10) / 10 : '',
+    water_g: waterG !== null ? Math.round(waterG * 10) / 10 : '',
+    battery: document.getElementById('power-batt').innerText || '',
+    power:   document.getElementById('power-src').innerText  || ''
+  });
+
+  saveLog(rows);
+  updateLogUI();
+}
+
+// Refresh the data log UI — stats + table preview
+function updateLogUI() {
+  const rows = getLog();
+
+  // Stats
+  const totalRows = rows.length;
+  const uniqueDays = new Set(rows.map(r => r.date)).size;
+  const storageBytes = new Blob([localStorage.getItem(STORAGE_KEY) || '']).size;
+  const storageKB    = (storageBytes / 1024).toFixed(1);
+
+  document.getElementById('log-total-rows').innerText  = totalRows;
+  document.getElementById('log-days').innerText        = uniqueDays;
+  document.getElementById('log-size').innerText        = storageKB + ' KB';
+  document.getElementById('log-storage-info').innerText = storageKB + ' KB used';
+
+  // Table — last 50 rows, newest first
+  const tbody   = document.getElementById('log-table-body');
+  const preview = rows.slice(-50).reverse();
+
+  if (!preview.length) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="5" style="text-align:center; padding:20px; color:#4a6080;">
+          No data yet
+        </td>
+      </tr>`;
+    return;
+  }
+
+  const evClassMap = {
+    Sensor:   'ev-sensor',
+    Feed:     'ev-feed',
+    Water:    'ev-water',
+    Motion:   'ev-motion',
+    Alert:    'ev-alert',
+    Snapshot: 'ev-snapshot',
+    Tare:     'ev-tare',
+    System:   'ev-system'
+  };
+
+  tbody.innerHTML = preview.map(r => `
+    <tr>
+      <td>${r.time}</td>
+      <td class="${evClassMap[r.event] || 'ev-sensor'}">${r.event}</td>
+      <td>${r.food_g  !== '' ? r.food_g  + 'g' : '—'}</td>
+      <td>${r.water_g !== '' ? r.water_g + 'g' : '—'}</td>
+      <td style="max-width:110px; overflow:hidden; text-overflow:ellipsis; color:#4a6080;">
+        ${r.detail}
+      </td>
+    </tr>`
+  ).join('');
+}
+
+// Export all rows to Excel file
+function exportExcel() {
+  const rows = getLog();
+  if (!rows.length) {
+    alert('No data to export yet.');
+    return;
+  }
+
+  // Build worksheet with header info + data
+  const wsData = [
+    ['KIRA Pet Feeder — Data Export'],
+    ['Generated:', new Date().toLocaleString('en-IN')],
+    ['Total Rows:', rows.length],
+    [],
+    ['Date', 'Time', 'Event', 'Food (g)', 'Water (g)', 'Detail', 'Battery', 'Power Source']
+  ];
+
+  rows.forEach(r => {
+    wsData.push([
+      r.date,
+      r.time,
+      r.event,
+      r.food_g,
+      r.water_g,
+      r.detail,
+      r.battery,
+      r.power
+    ]);
+  });
+
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+  // Set column widths for readability
+  ws['!cols'] = [
+    { wch: 12 },  // Date
+    { wch: 10 },  // Time
+    { wch: 12 },  // Event
+    { wch: 10 },  // Food
+    { wch: 10 },  // Water
+    { wch: 30 },  // Detail
+    { wch: 10 },  // Battery
+    { wch: 14 }   // Power Source
+  ];
+
+  XLSX.utils.book_append_sheet(wb, ws, 'KIRA Data');
+
+  const filename = `KIRA_Data_${new Date().toISOString().slice(0, 10)}.xlsx`;
+  XLSX.writeFile(wb, filename);
+
+  logItem(`Exported ${rows.length} rows → ${filename}`, 'success');
+}
+
+// Clear all log data after confirmation
+function clearDataLog() {
+  const count = getLog().length;
+  if (!confirm(`Clear all ${count} log entries? This cannot be undone.`)) return;
+  localStorage.removeItem(STORAGE_KEY);
+  updateLogUI();
+  logItem('Data log cleared', 'alert');
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// AI DETECTION — TensorFlow.js COCO-SSD
+// Loads in background 2s after page load — does not block MQTT
+// ════════════════════════════════════════════════════════════════════════════
 function loadDetectionModel() {
-  // Wait until cocoSsd is available (scripts are defer loaded)
+  // cocoSsd script is deferred — wait until available
   if (typeof cocoSsd === 'undefined') {
     setTimeout(loadDetectionModel, 500);
     return;
   }
   document.getElementById('ai-model-status').innerText = 'AI: Loading model...';
-  cocoSsd.load().then(model => {
-    detModel   = model;
-    modelReady = true;
-    document.getElementById('ai-model-status').innerText = 'AI: Ready ✓';
-    console.log('[KIRA AI] COCO-SSD model loaded');
-  }).catch(err => {
-    document.getElementById('ai-model-status').innerText = 'AI: Failed';
-    console.warn('[KIRA AI] Model load failed:', err);
-  });
+  cocoSsd.load()
+    .then(model => {
+      detModel   = model;
+      modelReady = true;
+      document.getElementById('ai-model-status').innerText = 'AI: Ready ✓';
+      console.log('[KIRA AI] COCO-SSD loaded');
+    })
+    .catch(err => {
+      document.getElementById('ai-model-status').innerText = 'AI: Failed';
+      console.warn('[KIRA AI] Load failed:', err);
+    });
 }
 
-// Run detection on the snapshot image, draw results on canvas
+// Run detection on a loaded image element, draw results on canvas
 async function runDetection(imgEl) {
-  const canvas  = document.getElementById('det-canvas');
-  const badge   = document.getElementById('ai-badge');
-  const ctx     = canvas.getContext('2d');
+  const canvas = document.getElementById('det-canvas');
+  const badge  = document.getElementById('ai-badge');
+  const ctx    = canvas.getContext('2d');
 
-  // Draw image on canvas first (always — even if model not ready)
-  canvas.width  = imgEl.naturalWidth  || imgEl.width  || 640;
-  canvas.height = imgEl.naturalHeight || imgEl.height || 480;
+  // Always draw the image first — even if model isn't ready
+  canvas.width  = imgEl.naturalWidth  || 640;
+  canvas.height = imgEl.naturalHeight || 480;
   ctx.drawImage(imgEl, 0, 0, canvas.width, canvas.height);
   canvas.style.display = 'block';
 
   if (!modelReady || !detModel) {
-    badge.className   = 'ai-badge none';
-    badge.innerText   = '🔄 AI loading...';
+    badge.className = 'ai-badge none';
+    badge.innerText = '🔄 AI loading...';
+    addLogRow('Snapshot', 'AI not ready', lastFoodGrams, lastWaterGrams);
     return;
   }
 
@@ -459,50 +925,45 @@ async function runDetection(imgEl) {
   try {
     const predictions = await detModel.detect(imgEl);
 
-    // Filter only pet classes with confidence > 40%
+    // Filter to pets only with >40% confidence
     const pets = predictions.filter(p =>
       PET_CLASSES.includes(p.class) && p.score > 0.4
     );
 
-    // Redraw image cleanly before boxes
+    // Redraw clean image before adding boxes
     ctx.drawImage(imgEl, 0, 0, canvas.width, canvas.height);
 
     if (pets.length === 0) {
       badge.className = 'ai-badge none';
       badge.innerText = '🐾 No pet detected';
+      addLogRow('Snapshot', 'No pet detected', lastFoodGrams, lastWaterGrams);
       return;
     }
 
-    // Draw bounding boxes
+    // Draw bounding box with corner accent style for each pet
     pets.forEach((pet, idx) => {
       const [x, y, w, h] = pet.bbox;
       const color = idx === 0 ? BOX_COLOR : BOX_COLOR_2;
       const label = `${pet.class} ${Math.round(pet.score * 100)}%`;
+      const cs    = 14;  // corner size
 
-      // Box
+      // Full box (thin)
       ctx.strokeStyle = color;
       ctx.lineWidth   = 2.5;
       ctx.strokeRect(x, y, w, h);
 
-      // Corner accents — more elegant than full box
-      const cs = 14; // corner size
+      // Corner accents (thick) — more elegant than full box
       ctx.lineWidth = 3.5;
-      // Top-left
-      ctx.beginPath(); ctx.moveTo(x, y + cs); ctx.lineTo(x, y); ctx.lineTo(x + cs, y); ctx.stroke();
-      // Top-right
-      ctx.beginPath(); ctx.moveTo(x + w - cs, y); ctx.lineTo(x + w, y); ctx.lineTo(x + w, y + cs); ctx.stroke();
-      // Bottom-left
-      ctx.beginPath(); ctx.moveTo(x, y + h - cs); ctx.lineTo(x, y + h); ctx.lineTo(x + cs, y + h); ctx.stroke();
-      // Bottom-right
+      ctx.beginPath(); ctx.moveTo(x, y + cs);     ctx.lineTo(x, y);         ctx.lineTo(x + cs, y);     ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x + w - cs, y); ctx.lineTo(x + w, y);     ctx.lineTo(x + w, y + cs); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x, y + h - cs); ctx.lineTo(x, y + h);     ctx.lineTo(x + cs, y + h); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(x + w - cs, y + h); ctx.lineTo(x + w, y + h); ctx.lineTo(x + w, y + h - cs); ctx.stroke();
 
-      // Label background
-      ctx.font      = 'bold 12px sans-serif';
-      const tw      = ctx.measureText(label).width;
+      // Label background + text
+      ctx.font = 'bold 12px sans-serif';
+      const tw = ctx.measureText(label).width;
       ctx.fillStyle = color;
       ctx.fillRect(x, y - 20, tw + 10, 20);
-
-      // Label text
       ctx.fillStyle = '#0a1628';
       ctx.fillText(label, x + 5, y - 5);
     });
@@ -512,94 +973,172 @@ async function runDetection(imgEl) {
     badge.className = 'ai-badge detected';
     badge.innerText = `🐾 ${names} detected (${pets.length})`;
 
-    logItem(`AI: ${pets.length} pet(s) detected — ${names}`, 'success');
+    logItem(`AI: ${pets.length} pet(s) — ${names}`, 'success');
+    addLogRow('Snapshot',
+      `AI: ${names} (${Math.round(pets[0].score * 100)}%)`,
+      lastFoodGrams, lastWaterGrams
+    );
 
   } catch (err) {
     console.warn('[KIRA AI] Detection error:', err);
     badge.className = 'ai-badge error';
     badge.innerText = '⚠ Detection error';
+    addLogRow('Snapshot', 'AI detection error', lastFoodGrams, lastWaterGrams);
   }
 }
 
-// ── Timeline ─────────────────────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════════════════════
+// TIMELINE — 30-minute bar chart
+// ════════════════════════════════════════════════════════════════════════════
 function buildTimeline() {
   const wrap = document.getElementById('timeline-bars');
   wrap.innerHTML = '';
+
   for (let i = 0; i < BUCKET_COUNT; i++) {
     const pair = document.createElement('div');
-    pair.style.cssText = 'flex:1;display:flex;flex-direction:column;gap:2px;align-items:center;height:100%';
+    pair.style.cssText =
+      'flex:1; display:flex; flex-direction:column; gap:2px; align-items:center; height:100%;';
+
     const fb = document.createElement('div');
-    fb.className = 'tbar food-bar-t'; fb.id = `fb-${i}`; fb.style.width = '100%'; fb.style.height = '3px';
+    fb.className = 'tbar food-bar-t';
+    fb.id = `fb-${i}`;
+    fb.style.cssText = 'width:100%; height:3px;';
+
     const wb = document.createElement('div');
-    wb.className = 'tbar water-bar-t'; wb.id = `wb-${i}`; wb.style.width = '100%'; wb.style.height = '3px';
-    pair.appendChild(fb); pair.appendChild(wb); wrap.appendChild(pair);
+    wb.className = 'tbar water-bar-t';
+    wb.id = `wb-${i}`;
+    wb.style.cssText = 'width:100%; height:3px;';
+
+    pair.appendChild(fb);
+    pair.appendChild(wb);
+    wrap.appendChild(pair);
   }
 }
 
+// Update the rolling bucket with new sensor data
 function updateHistory(foodG, waterG) {
   const now = Date.now();
+
+  // Advance to next bucket if 1 minute has passed
   if (now - lastBucketTime >= BUCKET_MS) {
     currentBucket = (currentBucket + 1) % BUCKET_COUNT;
-    history[currentBucket] = { foodStart: null, waterStart: null, foodConsumed: 0, waterConsumed: 0 };
+    history[currentBucket] = {
+      foodStart: null, waterStart: null,
+      foodConsumed: 0, waterConsumed: 0
+    };
     lastBucketTime = now;
   }
+
   const bucket = history[currentBucket];
+
+  // Set start reference (first reading in this bucket)
   if (bucket.foodStart  === null && foodG  !== null) bucket.foodStart  = foodG;
   if (bucket.waterStart === null && waterG !== null) bucket.waterStart = waterG;
-  if (bucket.foodStart  !== null && foodG  !== null) bucket.foodConsumed  = Math.max(0, bucket.foodStart  - foodG);
-  if (bucket.waterStart !== null && waterG !== null) bucket.waterConsumed = Math.max(0, bucket.waterStart - waterG);
+
+  // Consumed = start weight - current weight (positive = eaten/drunk)
+  if (bucket.foodStart  !== null && foodG  !== null) {
+    bucket.foodConsumed  = Math.max(0, bucket.foodStart  - foodG);
+  }
+  if (bucket.waterStart !== null && waterG !== null) {
+    bucket.waterConsumed = Math.max(0, bucket.waterStart - waterG);
+  }
+
   lastFoodGrams  = foodG;
   lastWaterGrams = waterG;
+
   renderHistory();
 }
 
+// Render bar chart and summary numbers
 function renderHistory() {
+  // Find max values for proportional bar heights
   let maxF = 1, maxW = 1;
-  history.forEach(b => { if (b.foodConsumed > maxF) maxF = b.foodConsumed; if (b.waterConsumed > maxW) maxW = b.waterConsumed; });
+  history.forEach(b => {
+    if (b.foodConsumed  > maxF) maxF = b.foodConsumed;
+    if (b.waterConsumed > maxW) maxW = b.waterConsumed;
+  });
+
+  // Sum totals and find peaks
   let totalFood = 0, totalWater = 0, peakFood = 0, peakWater = 0;
   history.forEach(b => {
-    totalFood += b.foodConsumed; totalWater += b.waterConsumed;
-    if (b.foodConsumed > peakFood) peakFood = b.foodConsumed;
+    totalFood  += b.foodConsumed;
+    totalWater += b.waterConsumed;
+    if (b.foodConsumed  > peakFood)  peakFood  = b.foodConsumed;
     if (b.waterConsumed > peakWater) peakWater = b.waterConsumed;
   });
+
   document.getElementById('food-consumed').innerText  = Math.round(totalFood);
   document.getElementById('water-consumed').innerText = Math.round(totalWater);
-  document.getElementById('food-peak').innerText  = peakFood  > 0 ? `Peak: ${Math.round(peakFood)}g/min`  : 'Peak: --';
-  document.getElementById('water-peak').innerText = peakWater > 0 ? `Peak: ${Math.round(peakWater)}g/min` : 'Peak: --';
+  document.getElementById('food-peak').innerText  =
+    peakFood  > 0 ? `Peak: ${Math.round(peakFood)}g/min`  : 'Peak: --';
+  document.getElementById('water-peak').innerText =
+    peakWater > 0 ? `Peak: ${Math.round(peakWater)}g/min` : 'Peak: --';
+
+  // Render bars — chronological (oldest left, newest right)
   for (let i = 0; i < BUCKET_COUNT; i++) {
-    const idx = (currentBucket + 1 + i) % BUCKET_COUNT;
-    const b   = history[idx];
-    const fh  = maxF > 0 ? (b.foodConsumed  / maxF) * 55 : 0;
-    const wh  = maxW > 0 ? (b.waterConsumed / maxW) * 55 : 0;
-    const fb  = document.getElementById(`fb-${i}`);
-    const wb  = document.getElementById(`wb-${i}`);
+    const idx     = (currentBucket + 1 + i) % BUCKET_COUNT;
+    const b       = history[idx];
+    const fh      = maxF > 0 ? (b.foodConsumed  / maxF) * 55 : 0;
+    const wh      = maxW > 0 ? (b.waterConsumed / maxW) * 55 : 0;
     const minsAgo = BUCKET_COUNT - i;
-    if (fb) { fb.style.height = Math.max(3, fh) + 'px'; fb.setAttribute('data-tip', `${minsAgo}min ago: ${Math.round(b.foodConsumed)}g food`); }
-    if (wb) { wb.style.height = Math.max(3, wh) + 'px'; wb.setAttribute('data-tip', `${minsAgo}min ago: ${Math.round(b.waterConsumed)}g water`); }
+
+    const fb = document.getElementById(`fb-${i}`);
+    const wb = document.getElementById(`wb-${i}`);
+
+    if (fb) {
+      fb.style.height = Math.max(3, fh) + 'px';
+      fb.setAttribute('data-tip', `${minsAgo}min ago: ${Math.round(b.foodConsumed)}g food`);
+    }
+    if (wb) {
+      wb.style.height = Math.max(3, wh) + 'px';
+      wb.setAttribute('data-tip', `${minsAgo}min ago: ${Math.round(b.waterConsumed)}g water`);
+    }
   }
-  document.getElementById('history-updated').innerText = 'Updated ' + new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+
+  document.getElementById('history-updated').innerText =
+    'Updated ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-// ── MQTT connect ──────────────────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════════════════════
+// MQTT — connect and maintain connection
+// ════════════════════════════════════════════════════════════════════════════
 function connect() {
-  if (typeof Paho === 'undefined') { logItem("Waiting for MQTT library...", "alert"); setTimeout(connect, 1000); return; }
+  if (typeof Paho === 'undefined') {
+    logItem("Waiting for MQTT library...", "alert");
+    setTimeout(connect, 1000);
+    return;
+  }
+
   try {
     client = new Paho.Client(BROKER, PORT, "/mqtt", CLIENT);
+
     client.onConnectionLost = (r) => {
-      connected = false; setConnUI(false, "Disconnected");
+      connected = false;
+      setConnUI(false, "Disconnected");
       logItem("Connection lost: " + r.errorMessage, "alert");
+      addLogRow('System', 'MQTT disconnected: ' + r.errorMessage);
       setTimeout(connect, 5000);
     };
-    client.onMessageArrived = (msg) => { handleMessage(msg.destinationName, msg.payloadString); };
+
+    client.onMessageArrived = (msg) => {
+      handleMessage(msg.destinationName, msg.payloadString);
+    };
+
     client.connect({
-      useSSL: true, userName: USER, password: PASS,
+      useSSL:   true,
+      userName: USER,
+      password: PASS,
       onSuccess: () => {
-        connected = true; setConnUI(true, "Connected");
+        connected = true;
+        setConnUI(true, "Connected");
         logItem("Connected to HiveMQ Cloud", "success");
+        addLogRow('System', 'KIRA Web UI connected');
+
+        // Subscribe to all KIRA topics
         client.subscribe("kira/sensors");
         client.subscribe("kira/camera/snapshot");
-        client.subscribe("kira/status");
-        client.subscribe("kira/alert");
+        client.subscribe("kira/status");    // Feed done, Water done, Scheduled feed
+        client.subscribe("kira/alert");     // Food low, Water low, Motion
       },
       onFailure: (e) => {
         setConnUI(false, "Login Failed");
@@ -607,148 +1146,268 @@ function connect() {
         setTimeout(connect, 5000);
       }
     });
-  } catch(e) { console.error(e); }
+
+  } catch (e) {
+    console.error('[MQTT] Connect error:', e);
+  }
 }
 
-// ── Message handler ───────────────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════════════════════
+// MESSAGE HANDLER — routes incoming MQTT messages
+// ════════════════════════════════════════════════════════════════════════════
 function handleMessage(topic, payload) {
+
+  // ── Sensor data from Nano via ESP32-CAM ──────────────────────────────────
   if (topic === "kira/sensors") {
-    try { updateSensors(JSON.parse(payload)); } catch(e) { console.error("JSON Parse Error", e); }
+    try {
+      updateSensors(JSON.parse(payload));
+    } catch (e) {
+      console.error('[MQTT] Sensor JSON parse error:', e);
+    }
   }
+
+  // ── Camera snapshot (base64 JPEG) ────────────────────────────────────────
   else if (topic === "kira/camera/snapshot") {
     const img = document.getElementById("snapshot");
-
-    // When image fully loaded — draw on canvas then run detection
     img.onload = () => {
       document.getElementById("cam-placeholder").style.display = "none";
       document.getElementById("cam-ts").style.display  = "block";
       document.getElementById("cam-ts").innerText = new Date().toLocaleTimeString();
-      runDetection(img);  // draw + detect
+      runDetection(img);  // draw image + run AI detection
     };
-
     img.src = "data:image/jpeg;base64," + payload;
     logItem("Snapshot received", "success");
   }
+
+  // ── Alert from device (food low, water low, motion) ──────────────────────
   else if (topic === "kira/alert") {
-    try { const d = JSON.parse(payload); logItem("⚠️ ALERT: " + (d.alert || payload), "alert"); }
-    catch { logItem("⚠️ " + payload, "alert"); }
+    try {
+      const d = JSON.parse(payload);
+      const a = d.alert || payload;
+      logItem("⚠️ ALERT: " + a, "alert");
+
+      if (a === 'MOTION_DETECTED') {
+        addLogRow('Motion', 'PIR triggered', lastFoodGrams, lastWaterGrams);
+      } else {
+        addLogRow('Alert', a, lastFoodGrams, lastWaterGrams);
+      }
+    } catch {
+      logItem("⚠️ " + payload, "alert");
+    }
+  }
+
+  // ── Status updates (feed done, water done, schedule) ─────────────────────
+  else if (topic === "kira/status") {
+    try {
+      const d = JSON.parse(payload);
+      const s = d.status || '';
+
+      if (s.includes('Feed complete') || s.includes('Scheduled feed')) {
+        addLogRow('Feed', s, lastFoodGrams, lastWaterGrams);
+      }
+      if (s.includes('Water dispensed')) {
+        addLogRow('Water', s, lastFoodGrams, lastWaterGrams);
+      }
+      if (s.includes('tared') || s.includes('Taring')) {
+        addLogRow('Tare', s, lastFoodGrams, lastWaterGrams);
+      }
+    } catch (e) {
+      console.warn('[MQTT] Status parse error:', e);
+    }
   }
 }
 
-// ── Sensor update ─────────────────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════════════════════
+// SENSOR UPDATE — updates UI from JSON sensor payload
+// ════════════════════════════════════════════════════════════════════════════
 function updateSensors(d) {
+
+  // ── Food weight ──────────────────────────────────────────────────────────
   if (d.food_g !== undefined) {
-    const g = parseFloat(d.food_g), pct = Math.min(100, Math.max(0, (g / FOOD_MAX_G) * 100)), low = g <= FOOD_LOW_G;
-    document.getElementById('food-weight').innerHTML = Math.round(g) + '<span class="bowl-unit">g</span>';
-    document.getElementById('food-weight').className = 'bowl-weight ' + (low ? 'low' : 'ok');
-    document.getElementById('food-bar').style.width  = pct + '%';
-    document.getElementById('food-bar').className    = 'bowl-bar ' + (low ? 'low' : 'ok');
-    document.getElementById('food-status').innerText = low ? '⚠ Refill needed' : 'Good';
-    document.getElementById('food-cap').innerText    = `Max ~${FOOD_MAX_G}g`;
+    const g   = parseFloat(d.food_g);
+    const pct = Math.min(100, Math.max(0, (g / FOOD_MAX_G) * 100));
+    const low = g <= FOOD_LOW_G;
+
+    document.getElementById('food-weight').innerHTML  = Math.round(g) + '<span class="bowl-unit">g</span>';
+    document.getElementById('food-weight').className  = 'bowl-weight ' + (low ? 'low' : 'ok');
+    document.getElementById('food-bar').style.width   = pct + '%';
+    document.getElementById('food-bar').className     = 'bowl-bar '   + (low ? 'low' : 'ok');
+    document.getElementById('food-status').innerText  = low ? '⚠ Refill needed' : 'Good';
+    document.getElementById('food-cap').innerText     = `Max ~${FOOD_MAX_G}g`;
+
     updateHistory(g, lastWaterGrams);
   }
+
+  // ── Water weight ─────────────────────────────────────────────────────────
   if (d.water_g !== undefined) {
-    const g = parseFloat(d.water_g), pct = Math.min(100, Math.max(0, (g / WATER_MAX_G) * 100)), low = g <= WATER_LOW_G;
+    const g   = parseFloat(d.water_g);
+    const pct = Math.min(100, Math.max(0, (g / WATER_MAX_G) * 100));
+    const low = g <= WATER_LOW_G;
+
     document.getElementById('water-weight').innerHTML = Math.round(g) + '<span class="bowl-unit">g</span>';
     document.getElementById('water-weight').className = 'bowl-weight ' + (low ? 'low' : 'ok');
     document.getElementById('water-bar').style.width  = pct + '%';
-    document.getElementById('water-bar').className    = 'bowl-bar ' + (low ? 'low' : 'ok');
+    document.getElementById('water-bar').className    = 'bowl-bar '   + (low ? 'low' : 'ok');
     document.getElementById('water-status').innerText = low ? '⚠ Refill needed' : 'Good';
     document.getElementById('water-cap').innerText    = `Max ~${WATER_MAX_G}g`;
+
     updateHistory(lastFoodGrams, g);
   }
+
+  // ── Battery ──────────────────────────────────────────────────────────────
   if (d.battery !== undefined) {
     const b = document.getElementById('power-batt');
-    b.innerText = d.battery + "%"; b.className = 'power-value ' + (d.battery <= 25 ? 'red' : 'green');
+    b.innerText  = d.battery + "%";
+    b.className  = 'power-value ' + (d.battery <= 25 ? 'red' : 'green');
   }
+
+  // ── Power source ─────────────────────────────────────────────────────────
   if (d.wall !== undefined) {
     const p = document.getElementById('power-src');
-    p.innerText = d.wall ? "Wall socket" : "Battery"; p.className = 'power-value ' + (d.wall ? 'green' : 'orange');
+    p.innerText = d.wall ? "Wall socket" : "Battery";
+    p.className = 'power-value ' + (d.wall ? 'green' : 'orange');
   }
+
+  // ── WiFi status ──────────────────────────────────────────────────────────
   if (d.wifi !== undefined) {
     const w = document.getElementById('wifi-status');
-    w.innerText = d.wifi ? "Connected" : "Offline"; w.className = 'power-value ' + (d.wifi ? 'green' : 'red');
+    w.innerText = d.wifi ? "Connected" : "Offline";
+    w.className = 'power-value ' + (d.wifi ? 'green' : 'red');
   }
+
+  // ── Servo badge ──────────────────────────────────────────────────────────
   if (d.servo !== undefined) {
     const s = document.getElementById('servo-badge');
     s.innerHTML = `<div class="badge-dot"></div> Servo: ${d.servo}`;
     s.className = 'badge ' + (d.servo === 'open' ? 'badge-warn' : 'badge-ok');
   }
+
+  // ── Solenoid badge ───────────────────────────────────────────────────────
   if (d.solenoid !== undefined) {
     const s = document.getElementById('sol-badge');
     s.innerHTML = `<div class="badge-dot"></div> Valve: ${d.solenoid}`;
     s.className = 'badge ' + (d.solenoid === 'open' ? 'badge-warn' : 'badge-ok');
   }
+
+  // ── Periodic sensor log (~60 seconds) ────────────────────────────────────
+  sensorLogCounter++;
+  if (sensorLogCounter >= SENSOR_LOG_EVERY) {
+    sensorLogCounter = 0;
+    addLogRow(
+      'Sensor',
+      `Batt:${d.battery || '--'}% ${d.wall ? 'Wall' : 'Battery'}`,
+      lastFoodGrams,
+      lastWaterGrams
+    );
+  }
 }
 
-// ── Commands ──────────────────────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════════════════════
+// COMMANDS — send to device via MQTT
+// ════════════════════════════════════════════════════════════════════════════
 function sendCmd(cmd) {
-  if (!connected) return logItem("Not connected", "alert");
+  if (!connected) {
+    logItem("Not connected", "alert");
+    return;
+  }
   const msg = new Paho.Message(cmd);
   msg.destinationName = "kira/command";
   client.send(msg);
   logItem("Sent: " + cmd);
+
+  // Log manual commands to data log
+  if (cmd === 'FEED:NOW')   addLogRow('Feed',     'Manual feed command',    lastFoodGrams, lastWaterGrams);
+  if (cmd === 'WATER:NOW')  addLogRow('Water',    'Manual water command',   lastFoodGrams, lastWaterGrams);
+  if (cmd === 'SNAPSHOT')   addLogRow('Snapshot', 'Manual snapshot',        lastFoodGrams, lastWaterGrams);
 }
 
+// Tare both scales — requires bowls to be empty
 function tareScales() {
-  if (!connected) return logItem("Not connected", "alert");
+  if (!connected) {
+    logItem("Not connected", "alert");
+    return;
+  }
   if (!confirm("Ensure both bowls are EMPTY before taring. Proceed?")) return;
+
   sendCmd('TARE:ALL');
-  history = Array.from({length: BUCKET_COUNT}, () =>
-    ({ foodStart: null, waterStart: null, foodConsumed: 0, waterConsumed: 0 })
-  );
-  lastFoodGrams = null; lastWaterGrams = null;
+
+  // Reset 30-min history baselines
+  history = Array.from({ length: BUCKET_COUNT }, () => ({
+    foodStart: null, waterStart: null,
+    foodConsumed: 0, waterConsumed: 0
+  }));
+  lastFoodGrams  = null;
+  lastWaterGrams = null;
+
   renderHistory();
-  logItem("Tare command sent — baselines reset", "success");
+  logItem("Tare command sent — history baselines reset", "success");
+  addLogRow('Tare', 'Scales tared — baselines reset');
 }
 
+// ── Servo toggle ─────────────────────────────────────────────────────────────
 let servoIsOpen = false;
 function toggleServo() {
   if (!servoIsOpen) {
-    sendCmd('SERVO:OPEN'); servoIsOpen = true;
+    sendCmd('SERVO:OPEN');
+    servoIsOpen = true;
     document.getElementById('servo-btn').className = 'btn btn-warn';
     document.getElementById('servo-btn').innerHTML = '🔧 Close Flap';
   } else {
-    sendCmd('SERVO:CLOSE'); servoIsOpen = false;
+    sendCmd('SERVO:CLOSE');
+    servoIsOpen = false;
     document.getElementById('servo-btn').className = 'btn btn-secondary';
     document.getElementById('servo-btn').innerHTML = '🔧 Open Flap';
   }
 }
 
+// ── Valve toggle ─────────────────────────────────────────────────────────────
 let valveIsOpen = false;
 function toggleValve() {
   if (!valveIsOpen) {
-    sendCmd('VALVE:OPEN'); valveIsOpen = true;
+    sendCmd('VALVE:OPEN');
+    valveIsOpen = true;
     document.getElementById('valve-btn').className = 'btn btn-warn';
     document.getElementById('valve-btn').innerHTML = '🔧 Close Valve';
   } else {
-    sendCmd('VALVE:CLOSE'); valveIsOpen = false;
+    sendCmd('VALVE:CLOSE');
+    valveIsOpen = false;
     document.getElementById('valve-btn').className = 'btn btn-secondary';
     document.getElementById('valve-btn').innerHTML = '🔧 Open Valve';
   }
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// UI HELPERS
+// ════════════════════════════════════════════════════════════════════════════
+
+// Update connection dot + banner
 function setConnUI(ok, txt) {
-  document.getElementById("conn-dot").className = "conn-dot" + (ok ? " on" : "");
-  document.getElementById("conn-label").innerText = txt;
+  document.getElementById("conn-dot").className    = "conn-dot" + (ok ? " on" : "");
+  document.getElementById("conn-label").innerText  = txt;
   document.getElementById("conn-banner").className = ok ? "" : "show";
 }
 
+// Add item to in-session activity log (top of list)
 function logItem(m, type) {
   const log = document.getElementById("log");
   const div = document.createElement("div");
   div.className = "log-item " + (type || "");
-  div.innerHTML = `<span class="log-time">${new Date().toLocaleTimeString([],
-    {hour:'2-digit', minute:'2-digit'})}</span> ${m}`;
+  div.innerHTML = `
+    <span class="log-time">
+      ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+    </span> ${m}`;
   log.insertBefore(div, log.firstChild);
 }
 
-// ── Init ──────────────────────────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════════════════════
+// INIT
+// ════════════════════════════════════════════════════════════════════════════
 window.onload = () => {
   buildTimeline();
   renderHistory();
-  setTimeout(connect, 500);
-  setTimeout(loadDetectionModel, 2000);  // load AI model 2s after page load
+  updateLogUI();                         // load existing localStorage data on page open
+  setTimeout(connect, 500);             // connect to MQTT after 500ms
+  setTimeout(loadDetectionModel, 2000); // load AI model after 2s (non-blocking)
 };
 </script>
 </body>
