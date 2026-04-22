@@ -643,6 +643,10 @@
       <div class="power-label">WiFi</div>
       <div class="power-value" id="wifi-status">--</div>
     </div>
+    <div class="power-row">
+      <div class="power-label">Firmware</div>
+      <div class="power-value green" id="fw-version">--</div>
+    </div>
   </div>
 
   <!-- ══════════════════════════════════════════════════
@@ -1274,7 +1278,10 @@ function updateSensors(d) {
     w.innerText = d.wifi ? "Connected" : "Offline";
     w.className = 'power-value ' + (d.wifi ? 'green' : 'red');
   }
-
+   // ── Firmware version ─────────────────────────────────────────────────────
+  if (d.fw !== undefined) {
+    document.getElementById('fw-version').innerText = d.fw;
+  }
   // ── Servo badge ──────────────────────────────────────────────────────────
   if (d.servo !== undefined) {
     const s = document.getElementById('servo-badge');
